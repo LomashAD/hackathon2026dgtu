@@ -1,9 +1,46 @@
+# Окружение и секреты
 .venv/
+venv/
+.env
+*.env
+!.env.example
+
+# Python
 __pycache__/
 *.pyc
-.DS_Store
-.env
-storage/
-.files/
-docs/demo_output.docx
+
+# Кэши
+.cache/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.files/
+
+# Индексы и базы (Chroma, реестр версий, Матрица в JSON, собранные шаблоны)
+storage/
+.chroma/
+chroma/
+*.sqlite3
+*.db
+
+# Модели Ollama (если кладутся в проект)
+.ollama/
+ollama/
+models/
+
+# Логи и аудит-лог
+*.log
+logs/
+*.jsonl
+
+# Сгенерированные пользовательские .docx
+docs/demo_output.docx
+samples/*.docx
+output/
+
+# Материалы кейса Банка России: публиковать нельзя, кладутся локально (см. README)
+data/*
+!data/.gitkeep
+
+# Системное
+.DS_Store
