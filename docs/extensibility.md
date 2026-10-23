@@ -1,0 +1,64 @@
+# Расширяемость: новые инструкции, шаблоны и процессы
+
+## Новая инструкция или регламент (без правки кода)
+
+1. Положите файл в `data/`.
+2. Добавьте источник в `config.yaml → sources`:
+   ```yaml
+   - doc_id: reg_archive
+     title: Регламент электронного архива
+     short_title: Регламент электронного архива
+     file: data/Регламент_электронного_архива.docx
+     parser: numbered_docx          # instruction_pdf — PDF с главами «Глава N.» и пунктами «N.M.»
+     version: "1.0"
+     effective_date: "2027-01-01"
+     access_level: internal         # или confidential
+     access_overrides: {"4.2": confidential}
+   ```
+3. Выполните `python scripts/ingest.py --all` (или `--doc … --doc-id … --title … --parser …` без правки конфига). Работающий сервер подхватит индекс без перезапуска.
+
+Готовые парсеры: `instruction_pdf` (PDF: главы, пункты, подпункты, приложения, фильтр водяного знака), `numbered_docx` (DOCX с разделами «N. Заголовок» и пунктами «N.M.»), `approval_matrix` (матрица визирования в таблицу). Новый формат — одна функция `parse_x(path) -> list[section]` в `app/ingest/parsers.py` и строка в словаре `PARSERS`.
+
+## Новая версия документа
+
+`python scripts/ingest.py --doc data/<файл> --version 1.1 --date 2027-01-15`: прежняя версия уходит в архив, в выводе печатается дифф пунктов. Подробнее — [kb_interaction.md](kb_interaction.md).
+
+## Новый шаблон документа (модуль)
+
+1. Положите модуль `.docx` в `data/`.
+2. Создайте `templates_yaml/<id>.yaml`:
+   ```yaml
+   id: order_weekend_work
+   title: Приказ о работе в выходные дни
+   doc_kind: order
+   source_file: data/Модуль_приказа_о_работе_в_выходные.docx
+   description: Привлечение работников к работе в выходные и нерабочие праздничные дни
+   keywords: ["выходн\\w* дн", "праздничн"]
+   matrix_row: internal-1          # строка Матрицы → согласующие подставятся автоматически
+   fields:
+     - name: date
+       question: В какой день работа? (ДД.ММ.ГГГГ)
+       type: date                  # text | date | person | people | pairs | signer | control | choice | yesno
+       hint: "Подсказка из примечания модуля / пункта Инструкции"
+       example: 07.03.2027
+       optional: false
+   layout:                         # абзац модуля, начинающийся с match, заменяется на text (Jinja)
+     - {match: "1. Привлечь", text: "1. Привлечь к работе {{ date }} …"}
+   tables:
+     - {match: "И. О. Фамилия", cell: 2, text: "{{ signer }}"}
+   checklist:
+     - {text: "Распорядительная часть начинается словом «ПРИКАЗЫВАЮ:»", ref: "instr_dou:9.5.4"}
+   ```
+3. Всё. docxtpl-шаблон соберётся из модуля автоматически, а шаблон появится в подборе и в списке выбора. Дополнительно: `numbering` (перенумерация при необязательных пунктах), `derived` (вычисляемые поля, например число «проекту/проектам»), `row_tables` (таблицы с переменным числом строк), `matrix_conditions` (условные визы по ответу «да/нет»).
+
+## Новые роли и уровни доступа
+
+`config.yaml → access_levels` и `roles` (название, список уровней, `can_view_archive`). Фильтр в индексе строится из этого списка.
+
+## Новые процессы и намерения
+
+- **Новое намерение:** правило (regex) в `app/dialog/intents.py` и обработчик в `Engine._route`. Метка для запасного LLM-классификатора — в `CLASSIFY_SYSTEM`.
+- **Новые детерминированные справочники** (например, Матрица маршрутизации по функциям, п. 4.1.4) — по образцу `app/approval/matrix.py`: парсер в таблицу и функция lookup.
+- **Новые проверки документа** — функция-правило в `app/review/checker.py` со ссылкой на пункт.
+- **Интеграции:** REST API (`POST /api/ask`) позволяет подключить бота к порталу, ИИС ДО или мессенджеру без Chainlit. Поп-ап виджет — `public/portal_widget.html`.
+- **Смена модели:** `config.yaml → llm.model` (например `qwen2.5:7b-instruct`). Можно включить или отключить пояснения (`llm.explain`) и перефразирование вопросов (`llm.rephrase_questions`).
