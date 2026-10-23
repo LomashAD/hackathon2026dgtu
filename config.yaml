@@ -1,0 +1,119 @@
+# Конфигурация помощника по регламентам. Все параметры меняются здесь, без правки кода.
+
+llm:
+  base_url: ${OLLAMA_HOST:-http://localhost:11434}
+  model: qwen2.5:1.5b-instruct        # заменить на qwen2.5:7b-instruct / 14b-instruct одной строкой
+  temperature: 0
+  num_ctx: 4096
+  timeout_s: 120
+  explain: true                       # короткое пояснение «простыми словами» от модели
+  rephrase_questions: true            # перефразирование вопросов при заполнении шаблона
+  max_explain_tokens: 220
+
+embeddings:
+  model: bge-m3                       # альтернатива: любая embedding-модель Ollama
+  batch_size: 16
+
+paths:
+  data_dir: data
+  storage_dir: storage
+  index_dir: storage/chroma
+  registry: storage/registry.json
+  matrix: storage/matrix.json
+  output_dir: storage/output
+  audit_log: storage/logs/audit.jsonl
+  feedback_log: storage/logs/feedback.jsonl
+  unanswered_log: storage/logs/unanswered.jsonl
+  app_log: storage/logs/app.log
+  templates_yaml: templates_yaml
+  templates_docx: storage/templates_docx
+
+# Коллекции источников базы знаний. Новый документ = новая запись здесь
+# (или scripts/ingest.py --doc ... --parser ...), код не меняется.
+sources:
+  - doc_id: instr_dou
+    title: Инструкция по документационному обеспечению управления и документообороту Организации
+    short_title: Инструкция по ДОУ
+    file: data/Инструкция_по_ДОУ_учебный_пример.pdf
+    parser: instruction_pdf
+    version: "1.0"
+    effective_date: "2026-11-01"
+    access_level: internal
+    # Отдельные пункты с повышенным уровнем доступа (демонстрация разграничения доступа, см. docs/decisions.md D-05)
+    access_overrides:
+      "2.11": confidential
+      "11.13": confidential
+      "11.23": confidential
+  - doc_id: mr_modules
+    title: Методические рекомендации по работе с модульными документами
+    short_title: Метод. рекомендации по модульным документам
+    file: data/Методические_рекомендации_по_работе_с_модульными_документами.docx
+    parser: numbered_docx
+    version: "1.0"
+    effective_date: "2026-11-01"
+    access_level: internal
+  - doc_id: matrix_viz
+    title: Матрица обязательного визирования проектов внутренних и внешних документов Организации
+    short_title: Матрица обязательного визирования
+    file: data/Матрица_обязательного_визирования_внутренних_и_внешних_документов.docx
+    parser: approval_matrix            # загружается в таблицу; текст строк индексируется для поиска
+    version: "1.0"
+    effective_date: "2026-11-01"
+    access_level: internal
+
+# Уровни доступа (по возрастанию) и роли. В продакшне роль приходит из SSO.
+access_levels: [public, internal, confidential]
+roles:
+  employee:
+    title: Сотрудник
+    levels: [public, internal]
+  expert:
+    title: Эксперт ДОУ
+    levels: [public, internal, confidential]
+  admin:
+    title: Администратор
+    levels: [public, internal, confidential]
+    can_view_archive: true
+default_role: employee
+
+retrieval:
+  vector_k: 20             # кандидатов из векторного поиска
+  bm25_k: 20               # кандидатов из BM25
+  top_k: 4                 # фрагментов в ответ
+  w_vector: 0.80           # вес векторной близости в итоговой релевантности
+  w_bm25: 0.20             # вес лексического совпадения
+  cos_low: 0.40            # косинус, соответствующий 0 % релевантности
+  cos_high: 0.68           # косинус, соответствующий 100 % релевантности
+  min_relevance: 0.50      # порог: ниже — «в базе знаний недостаточно информации»
+  min_show: 0.40           # фрагменты ниже этого значения не показываются
+  rel_gap: 0.20            # показывать только фрагменты не хуже (лучший − rel_gap)
+  expand_refs: 2           # сколько связанных пунктов по refs подтягивать
+  quote_max_chars: 1500    # длина цитаты пункта в ответе
+  quote_count: 2           # сколько пунктов цитировать дословно (максимум)
+  quote_gap: 0.03          # второй пункт цитируется, если его релевантность не ниже лучшей − quote_gap
+
+# Куда обратиться, если ответа нет (из Инструкции: п. 2.1, 4.1.3, 12.4)
+contacts:
+  default:
+    unit: Департамент документационного обеспечения (Департамент ДОУ); в РО Организации — подразделение ДОУ РО
+    basis: "п. 2.1 и 4.1.3 Инструкции: Департамент ДОУ консультирует работников и подразделения, оказывает методическую поддержку"
+    ref: {doc_id: instr_dou, section: "2.1"}
+  access:
+    unit: Департамент информационной безопасности (права пользователей ИИС ДО)
+    basis: "п. 2.5 Инструкции"
+    ref: {doc_id: instr_dou, section: "2.5"}
+  iis:
+    unit: Работники, назначенные координаторами ИИС ДО в подразделении; техническое администрирование — Департамент ДОУ
+    basis: "п. 2.5 и 2.7 Инструкции"
+    ref: {doc_id: instr_dou, section: "2.7"}
+  hr:
+    unit: Кадровое подразделение (приказы по личному составу)
+    basis: "п. 7.6 и 9.6 Инструкции"
+    ref: {doc_id: instr_dou, section: "9.6"}
+
+security:
+  mask_pii_in_logs: true
+  max_message_chars: 2000
+
+ui:
+  title: Помощник по документообороту

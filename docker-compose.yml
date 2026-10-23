@@ -1,0 +1,51 @@
+# Запуск: docker compose up --build
+# На macOS Docker не даёт контейнерам доступ к GPU (Metal) — там рекомендуется ./run.sh (нативная Ollama),
+# либо: OLLAMA_HOST=http://host.docker.internal:11434 docker compose up app
+services:
+  ollama:
+    image: ollama/ollama:0.40.9
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [backend]
+
+  # Однократная загрузка моделей (единственный сервис, которому нужен интернет; в закрытом контуре
+  # модели заранее переносятся в том ollama, а этот сервис не запускается)
+  ollama-init:
+    image: ollama/ollama:0.40.9
+    depends_on:
+      ollama: {condition: service_healthy}
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["sh", "-c", "ollama pull qwen2.5:1.5b-instruct && ollama pull bge-m3"]
+    networks: [backend, egress]
+
+  app:
+    build: .
+    depends_on:
+      ollama-init: {condition: service_completed_successfully}
+    environment:
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      ANONYMIZED_TELEMETRY: "False"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/srv/data:ro
+      - ./config.yaml:/srv/config.yaml:ro
+      - ./templates_yaml:/srv/templates_yaml:ro
+      - storage:/srv/storage
+    networks: [backend, frontend]
+
+volumes:
+  ollama:
+  storage:
+
+networks:
+  backend:
+    internal: true      # app ↔ ollama: без выхода в интернет
+  frontend: {}          # публикация порта 8000 пользователям
+  egress: {}            # только для ollama-init (загрузка моделей)
