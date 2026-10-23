@@ -14,7 +14,7 @@
 
 - **http://localhost:8000** — чат;
 - **http://localhost:8000/widget** — макет страницы портала с поп-ап виджетом;
-- **http://localhost:8000/api/health**, `POST /api/ask`, `/api/kb/versions` — REST API ядра.
+- **http://localhost:8000/api/health**, `POST /api/ask`, `/api/kb/versions`, `/api/kb/documents`, `/api/templates` — REST API ядра.
 
 Перед первым запуском нужны Python 3.11+ и Ollama (`brew install ollama` на macOS или https://ollama.com/download). Для первого запуска нужен интернет (зависимости и модели ~2,2 ГБ), дальше всё работает офлайн.
 

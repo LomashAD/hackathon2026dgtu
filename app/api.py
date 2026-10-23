@@ -68,6 +68,55 @@ def versions():
                 for v in d["versions"]] for k, d in reg["documents"].items()}
 
 
+@router.get("/api/kb/documents")
+def documents():
+    """Документы базы знаний (действующие редакции) — для раздела «Документы» портала."""
+    reg = load_registry()
+    out = []
+    for doc_id, d in reg["documents"].items():
+        active = next((v for v in d["versions"] if v["status"] == "active"), None)
+        if active:
+            out.append({"doc_id": doc_id, "title": d["title"], "version": active["version"],
+                        "effective_date": active["effective_date"], "sections": active["sections"],
+                        "archived": [v["version"] for v in d["versions"] if v["status"] == "archived"],
+                        "download": f"/api/kb/source/{doc_id}"})
+    return out
+
+
+@router.get("/api/kb/source/{doc_id}")
+def source_file(doc_id: str):
+    reg = load_registry()
+    d = reg["documents"].get(doc_id)
+    active = next((v for v in d["versions"] if v["status"] == "active"), None) if d else None
+    if not active:
+        raise HTTPException(404)
+    p = (ROOT / active["file"]).resolve()
+    if not p.is_relative_to(ROOT) or not p.exists():
+        raise HTTPException(404)
+    return FileResponse(p, filename=p.name)
+
+
+@router.get("/api/templates")
+def templates():
+    from app.templates.catalog import load_templates
+
+    return [{"id": t["id"], "title": t["title"], "description": " ".join(t.get("description", "").split()),
+             "download": f"/api/templates/{t['id']}/source"} for t in load_templates().values()]
+
+
+@router.get("/api/templates/{tid}/source")
+def template_source(tid: str):
+    from app.templates.catalog import load_templates
+
+    tpl = load_templates().get(tid)
+    if not tpl:
+        raise HTTPException(404)
+    p = (ROOT / tpl["source_file"]).resolve()
+    if not p.is_relative_to(ROOT) or not p.exists():
+        raise HTTPException(404)
+    return FileResponse(p, filename=p.name)
+
+
 @router.get("/widget", response_class=HTMLResponse)
 def widget():
     return HTMLResponse((ROOT / "public" / "portal_widget.html").read_text(encoding="utf-8"))

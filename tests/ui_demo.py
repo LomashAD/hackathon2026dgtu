@@ -157,6 +157,18 @@ async def main(url: str) -> int:
         await wpage.wait_for_timeout(4000)
         await wpage.screenshot(path=str(SHOTS / "09_portal_widget.png"))
         check(await wpage.locator("#panel.open").count() == 1, "поп-ап виджет открывается", failures)
+        await wpage.click("#close")
+        for tab, hash_ in [("Новости", "#news"), ("Документы", "#docs"), ("Сервисы", "#services"),
+                           ("Раздел Департамента ДОУ", "#dou")]:
+            await wpage.click(f"nav >> text={tab}")
+            await wpage.wait_for_timeout(1000)
+            visible = await wpage.locator(f"#tab-{hash_[1:]}:not([hidden])").count()
+            check(wpage.url.endswith(hash_) and visible == 1, f"вкладка портала «{tab}» открывается", failures)
+            if hash_ == "#docs":
+                check(await wpage.locator("#docs-body a").count() >= 3 and await wpage.locator("#tpl-body tr").count() == 7,
+                      "в «Документах» список документов базы знаний и 7 модулей", failures)
+            if hash_ == "#services":
+                check("работает" in await wpage.inner_text("#health"), "в «Сервисах» статус системы", failures)
         await browser.close()
 
     check(not external, f"нет запросов к внешним хостам (найдено: {external[:3]})", failures)
