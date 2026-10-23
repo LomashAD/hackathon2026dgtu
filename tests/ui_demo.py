@@ -164,6 +164,8 @@ async def main(url: str) -> int:
             await wpage.wait_for_timeout(1000)
             visible = await wpage.locator(f"#tab-{hash_[1:]}:not([hidden])").count()
             check(wpage.url.endswith(hash_) and visible == 1, f"вкладка портала «{tab}» открывается", failures)
+            if hash_ == "#news":
+                check(await wpage.locator("#news-body .card").count() >= 4, "в «Новостях» лента из news.yaml", failures)
             if hash_ == "#docs":
                 check(await wpage.locator("#docs-body a").count() >= 3 and await wpage.locator("#tpl-body tr").count() == 7,
                       "в «Документах» список документов базы знаний и 7 модулей", failures)

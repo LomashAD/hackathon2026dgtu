@@ -66,36 +66,9 @@
 <main>
   <!-- Новости -->
   <section id="tab-news" hidden>
-    <h1>Новости <span class="tag">демо</span></h1>
-    <div class="cards">
-      <div class="card">
-        <div class="meta">Департамент ДОУ</div>
-        <h2>С 1 ноября 2026 г. действует новая Инструкция по ДОУ</h2>
-        <p class="note">Инструкция по документационному обеспечению управления и документообороту утверждена приказом от 15.10.2026 № ОД-184 и вступает в силу 1 ноября 2026 г. (п. 12.11).</p>
-        <a class="btn ghost" href="#docs">К документам</a>
-      </div>
-      <div class="card">
-        <div class="meta">Руководителям подразделений</div>
-        <h2>60 дней на приведение локальных документов в соответствие</h2>
-        <p class="note">В течение 60 календарных дней со дня вступления Инструкции в силу руководители приводят локальные документы, маршруты, шаблоны и роли в соответствие (п. 12.12).</p>
-        <button class="btn ghost" data-ask="Что нужно сделать руководителям подразделений после вступления Инструкции в силу?">Спросить помощника</button>
-        <div class="answer"></div>
-      </div>
-      <div class="card">
-        <div class="meta">ИИС ДО</div>
-        <h2>Настройка ИИС ДО под новые правила — 90 дней</h2>
-        <p class="note">Департамент ИТ совместно с Департаментом ДОУ в течение 90 календарных дней настраивает справочники, статусы, маршруты и отчётность ИИС ДО (п. 12.13).</p>
-        <button class="btn ghost" data-ask="Что делать, если ИИС ДО не работает?">Что делать, если ИИС ДО недоступна?</button>
-        <div class="answer"></div>
-      </div>
-      <div class="card">
-        <div class="meta">Новый сервис</div>
-        <h2>Помощник по документообороту</h2>
-        <p class="note">Отвечает на вопросы по Инструкции со ссылками на пункты, подсказывает согласующих и сроки, готовит черновики приказов и распоряжений по модулям.</p>
-        <button class="btn" data-open-chat>Открыть помощника</button>
-      </div>
-    </div>
-    <p class="note" style="margin-top:16px">Новости — демонстрационное наполнение макета; факты взяты из Инструкции (глава 12).</p>
+    <h1>Новости</h1>
+    <div class="cards" id="news-body"><div class="note">Загрузка…</div></div>
+    <p class="note" style="margin-top:16px">Новости ведутся в файле <code>news.yaml</code>; о новых редакциях документов базы знаний лента сообщает автоматически.</p>
   </section>
 
   <!-- Документы -->
@@ -198,6 +171,7 @@
     const name = document.getElementById('tab-' + tab) ? tab : 'dou';
     document.querySelectorAll('main > section').forEach(s => s.hidden = s.id !== 'tab-' + name);
     document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === name));
+    if (name === 'news') loadNews();
     if (name === 'docs' && !loaded.docs) { loaded.docs = true; loadDocs(); }
     if (name === 'services') loadHealth();
     if (name === 'dou' && !loaded.dou) { loaded.dou = true; loadDouList(); }
@@ -205,6 +179,22 @@
   window.addEventListener('hashchange', show);
 
   async function getJSON(url) { const r = await fetch(url); if (!r.ok) throw new Error(r.status); return r.json(); }
+
+  async function loadNews() {
+    const el = document.getElementById('news-body');
+    try {
+      const items = await getJSON('/api/news');
+      el.innerHTML = items.map(n => `<div class="card">
+        <div class="meta">${fmtDate(n.date)}${n.unit ? ' · ' + esc(n.unit) : ''}${n.auto ? '<span class="tag">авто</span>' : ''}</div>
+        <h2>${esc(n.title)}</h2>${n.text ? `<p class="note">${esc(n.text)}</p>` : ''}
+        ${n.link ? `<a class="btn ghost" href="${esc(n.link)}">${esc(n.link_label || 'Подробнее')}</a>` : ''}
+        ${n.ask ? `<button class="btn ghost" data-ask="${esc(n.ask)}">${esc(n.ask_label || 'Спросить помощника')}</button><div class="answer"></div>` : ''}
+        ${n.open_chat ? '<button class="btn" data-open-chat>Открыть помощника</button>' : ''}</div>`).join('')
+        || '<div class="note">Новостей пока нет.</div>';
+      el.querySelectorAll('[data-open-chat]').forEach(b => b.onclick = openChat);
+      bindAsk(el);
+    } catch (e) { el.innerHTML = `<div class="bad">Не удалось загрузить новости (${esc(e.message)})</div>`; }
+  }
 
   async function loadDocs() {
     const body = document.getElementById('docs-body'), tb = document.getElementById('tpl-body');
@@ -246,7 +236,7 @@
 
   // --- быстрые ответы помощника через REST API
   const plain = md => md.replace(/\*\*/g, '').replace(/^> ?/gm, '').replace(/_⏱.*$/m, '').trim();
-  document.querySelectorAll('[data-ask]').forEach(btn => btn.onclick = async () => {
+  const bindAsk = root => root.querySelectorAll('[data-ask]').forEach(btn => btn.onclick = async () => {
     const box = btn.parentElement.querySelector('.answer');
     if (box.style.display === 'block') { box.style.display = 'none'; return; }
     box.style.display = 'block'; box.textContent = 'Помощник ищет ответ…';
@@ -259,6 +249,7 @@
       box.innerHTML = esc(text) + (d.sources.length ? '\n\nИсточники: ' + esc(d.sources.map(s => s.label.split(' — ')[0] + (s.relevance != null ? ` (${s.relevance} %)` : '')).join('; ')) : '');
     } catch (e) { box.textContent = 'Не удалось получить ответ.'; }
   });
+  bindAsk(document);
 
   show();
 </script>

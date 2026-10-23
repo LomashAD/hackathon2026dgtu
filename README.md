@@ -43,7 +43,7 @@ cp .env.example .env                      # при необходимости п
 
 - **http://localhost:8000/?chat** — чат;
 - **http://localhost:8000** (или `/widget`) — макет страницы портала с поп-ап виджетом;
-- **http://localhost:8000/api/health**, `POST /api/ask`, `/api/kb/versions`, `/api/kb/documents`, `/api/templates` — REST API ядра.
+- **http://localhost:8000/api/health**, `POST /api/ask`, `/api/kb/versions`, `/api/kb/documents`, `/api/templates`, `/api/news` — REST API ядра.
 
 Перед первым запуском нужны Python 3.11+ и Ollama (`brew install ollama` на macOS или https://ollama.com/download). Для первого запуска нужен интернет (зависимости и модели ~2,2 ГБ), дальше всё работает офлайн.
 
@@ -110,7 +110,7 @@ python tests/ui_demo.py
 ```
 app/
   main.py            Chainlit: чат, роли, источники, файлы, 👍/👎
-  api.py             FastAPI: /api/ask, /api/health, /api/kb/versions, /widget; фильтр внешних ссылок
+  api.py             FastAPI: /api/ask, /api/health, /api/kb/versions, /api/news, /widget; фильтр внешних ссылок
   dialog/            классификатор намерений (правила), движок диалога, уточнения, состояние сессии
   ingest/            парсеры PDF/DOCX, чанкинг по пунктам, индексация, версии
   retrieval/         гибридный поиск (bge-m3 + BM25), % релевантности, порог, связанные пункты
@@ -119,9 +119,11 @@ app/
   templates/         каталог шаблонов, заполнение полей, сборка docxtpl и рендер .docx
   review/            проверка загруженного черновика
   security/          роли и фильтр доступа, маскирование ПДн, аудит-лог
+  news.py            лента портала: news.yaml + новости о новых редакциях из реестра
 templates_yaml/      описания 7 модулей: поля, вопросы, валидация, подсказки, чек-листы
 scripts/ingest.py    загрузка новой версии документа
 config.yaml          модель, пороги, источники, роли, контакты
+news.yaml            новости вкладки «Новости» портала (правятся без кода)
 docs/                артефакты для сдачи (архитектура, сценарии, безопасность, демо…)
 ```
 

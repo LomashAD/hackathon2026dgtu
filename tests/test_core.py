@@ -228,6 +228,32 @@ def test_versioning(tmp_path, monkeypatch):
         cfgmod.get_config.cache_clear()
 
 
+# ------------------------------------------------------------------ новости портала
+
+def test_news_feed(tmp_path):
+    from app.news import news
+    f = tmp_path / "news.yaml"
+    f.write_text(yaml.safe_dump({"items": [
+        {"date": "2026-10-15", "title": "Старая", "link": "#docs"},
+        {"date": "2026-10-20", "title": "Внешняя ссылка", "link": "//evil.example/x"},
+        {"title": "Без даты"},
+        {"date": "15.10.2026", "title": "Дата не ISO"},
+    ]}, allow_unicode=True), encoding="utf-8")
+    reg = {"documents": {"instr_dou": {"title": "Инструкция", "versions": [
+        {"version": "1.0", "effective_date": "2026-11-01", "ingested_at": "2026-10-24T00:00:11", "diff_from_previous": None},
+        {"version": "1.1", "effective_date": "2027-01-15", "ingested_at": "2026-12-01T10:00:00",
+         "diff_from_previous": {"added": ["12.14"], "removed": [], "changed": ["1.1", "1.2", "2.1", "2.2", "3.1", "3.2"]}},
+    ]}}}
+    items = news(f, reg)
+    assert [n["title"] for n in items] == ["Новая редакция 1.1: Инструкция", "Внешняя ссылка", "Старая"]
+    auto = items[0]
+    assert auto["auto"] and auto["date"] == "2026-12-01" and "15.01.2027" in auto["text"]
+    assert "изменено: 6 (п. 1.1, п. 1.2, п. 2.1, п. 2.2, п. 3.1 и др.)" in auto["text"] and "добавлено: 1 (п. 12.14)" in auto["text"]
+    assert "link" not in items[1] and items[2]["link"] == "#docs"
+    assert news(tmp_path / "нет.yaml", reg) == items[:1]
+    assert len(news(ROOT / "news.yaml", {"documents": {}})) >= 4   # рабочий файл разбирается целиком
+
+
 # ------------------------------------------------------------------ интеграция (нужна Ollama)
 
 def _ollama_up() -> bool:

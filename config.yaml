@@ -27,6 +27,7 @@ paths:
   app_log: storage/logs/app.log
   templates_yaml: templates_yaml
   templates_docx: storage/templates_docx
+  news: news.yaml                     # новости портала, правятся без кода
 
 # Коллекции источников базы знаний. Новый документ = новая запись здесь
 # (или scripts/ingest.py --doc ... --parser ...), код не меняется.

@@ -96,6 +96,14 @@ def source_file(doc_id: str):
     return FileResponse(p, filename=p.name)
 
 
+@router.get("/api/news")
+def news():
+    """Лента вкладки «Новости»: news.yaml + новости о новых редакциях из реестра версий."""
+    from app.news import news as load_news
+
+    return load_news()
+
+
 @router.get("/api/templates")
 def templates():
     from app.templates.catalog import load_templates
