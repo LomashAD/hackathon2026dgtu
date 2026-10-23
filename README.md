@@ -41,8 +41,8 @@ cp .env.example .env                      # при необходимости п
 
 Скрипт создаёт `.venv` и ставит зависимости, запускает Ollama нативно (если она ещё не запущена), однократно скачивает модели из `config.yaml`, индексирует базу знаний (если она ещё не проиндексирована) и поднимает веб-интерфейс:
 
-- **http://localhost:8000** — чат;
-- **http://localhost:8000/widget** — макет страницы портала с поп-ап виджетом;
+- **http://localhost:8000/?chat** — чат;
+- **http://localhost:8000** (или `/widget`) — макет страницы портала с поп-ап виджетом;
 - **http://localhost:8000/api/health**, `POST /api/ask`, `/api/kb/versions`, `/api/kb/documents`, `/api/templates` — REST API ядра.
 
 Перед первым запуском нужны Python 3.11+ и Ollama (`brew install ollama` на macOS или https://ollama.com/download). Для первого запуска нужен интернет (зависимости и модели ~2,2 ГБ), дальше всё работает офлайн.

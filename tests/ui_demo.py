@@ -83,7 +83,7 @@ async def main(url: str) -> int:
         page = await ctx.new_page()
         local = re.compile(r"^(https?|wss?)://(localhost|127\.0\.0\.1)|^(data|blob):")
         page.on("request", lambda r: external.append(r.url) if not local.match(r.url) else None)
-        await page.goto(url, wait_until="networkidle")
+        await page.goto(url.rstrip("/") + "/?chat", wait_until="networkidle")
         await page.wait_for_timeout(1500)
         chat = Chat(page)
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 import gzip
 import re
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel
 
@@ -120,6 +120,16 @@ def template_source(tid: str):
 @router.get("/widget", response_class=HTMLResponse)
 def widget():
     return HTMLResponse((ROOT / "public" / "portal_widget.html").read_text(encoding="utf-8"))
+
+
+@router.get("/", include_in_schema=False)
+async def index(request: Request):
+    """Корень открывает портал; сам чат Chainlit — по адресу /?chat (так его грузит виджет)."""
+    if "chat" in request.query_params:
+        from chainlit.server import serve
+
+        return await serve(request)
+    return widget()
 
 
 _EXTERNAL_TAG = re.compile(r'<link[^>]+href="https?://[^"]+"[^>]*>|<meta[^>]+content="https?://[^"]+"[^>]*>')

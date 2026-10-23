@@ -127,7 +127,7 @@
         <h2>💬 Помощник по документообороту</h2>
         <p class="note">Вопросы по Инструкции, согласующие по Матрице, сроки, «куда обратиться».</p>
         <button class="btn" data-open-chat>Открыть в окне</button>
-        <a class="btn ghost" href="/" target="_blank" rel="noopener">Открыть на отдельной странице</a>
+        <a class="btn ghost" href="/?chat" target="_blank" rel="noopener">Открыть на отдельной странице</a>
       </div>
       <div class="card">
         <h2>📝 Подготовка документа по модулю</h2>
@@ -183,7 +183,7 @@
 
 <script>
   const panel = document.getElementById('panel'), frame = document.getElementById('frame');
-  const openChat = () => { if (!frame.src) frame.src = '/'; panel.classList.add('open'); };
+  const openChat = () => { if (!frame.src) frame.src = '/?chat'; panel.classList.add('open'); };
   document.getElementById('fab').onclick = () => panel.classList.contains('open') ? panel.classList.remove('open') : openChat();
   document.getElementById('close').onclick = () => panel.classList.remove('open');
   document.querySelectorAll('[data-open-chat]').forEach(b => b.onclick = openChat);
