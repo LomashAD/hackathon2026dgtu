@@ -256,3 +256,19 @@ def test_clarification_flow():
     assert r1.meta.get("clarification")
     r2 = get_engine().handle(s, "распоряжение")
     assert "3 рабочих дня" in r2.text and any(x.section == "10.3" for x in r2.sources)
+
+
+def test_ollama_down_message(monkeypatch):
+    import httpx
+
+    from app.dialog.engine import Session, get_engine
+
+    eng = get_engine()
+
+    def down(*a, **k):
+        raise httpx.ConnectError("[Errno 61] Connection refused")
+
+    monkeypatch.setattr(eng.retriever, "search", down)
+    r = eng.handle(Session(role="admin"), "Когда нужно зарегистрировать входящий документ?")
+    assert r.intent == "error"
+    assert "Ollama" in r.text and "Errno" not in r.text and "переформулир" in r.text.lower()

@@ -13,6 +13,8 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import httpx
+
 from app.approval import deadlines
 from app.approval.matrix import KIND_TITLES, get_matrix
 from app.config import get_config
@@ -113,9 +115,16 @@ class Engine:
         text = (text or "").strip()[: self.cfg["security"]["max_message_chars"]]
         try:
             reply = self._route(s, text, file)
-        except Exception as e:  # noqa: BLE001
+        except (httpx.ConnectError, httpx.TimeoutException):
+            log.exception("Ollama недоступна")
+            reply = Reply("Сервис поиска временно недоступен: не отвечает локальная языковая модель (Ollama). "
+                          "Переформулировать вопрос не нужно — повторите его через минуту. Если ошибка повторяется, "
+                          "сообщите администратору: нужно запустить Ollama (`ollama serve` или `./run.sh`).",
+                          intent="error")
+        except Exception:  # noqa: BLE001
             log.exception("ошибка обработки")
-            reply = Reply(f"Не удалось обработать запрос: {e}. Попробуйте переформулировать.", intent="error")
+            reply = Reply("Не удалось обработать запрос из-за внутренней ошибки. Повторите вопрос; "
+                          "если ошибка повторяется, сообщите администратору.", intent="error")
         latency = int((time.perf_counter() - t0) * 1000)
         reply.meta["latency_ms"] = latency
         s.history.append({"user": text, "intent": reply.intent, "refused": reply.refused})
