@@ -415,12 +415,11 @@ def match_doc(items: list[tuple[str, str]], text: str) -> tuple[str, str] | None
     if "модул" not in t:
         t = re.sub(r"\bпроект\w*", " ", t)
     t = re.sub(r"\bположен[оаы]?\b", " ", t)   # «сколько дней положено» — не «положение»
-    found = match_item(items, t)
-    if found:
-        return found
     if re.search(r"\b(ино\w+|друг\w+|проч\w+)\s+(вид\w*\s+)?документ", t):
         return next(((n, term) for n, term in items if n.startswith("иной")), None)
-    return None
+    if "аналитич" not in t:
+        t = re.sub(r"\bдокумент\w*", " ", t)   # «отправлю документ» — вид не назван, а не «аналитический документ»
+    return match_item(items, t)
 
 
 def match_sender(items: list[tuple[str, str]], text: str) -> tuple[str, str] | None:
