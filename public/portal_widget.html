@@ -31,7 +31,16 @@
   th, td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
   th { font-size:12px; color:var(--muted); font-weight:600; }
   .faq button { background:none; border:none; padding:0; color:var(--accent); cursor:pointer; text-align:left; font:inherit; }
-  .answer { margin-top:6px; font-size:13px; color:var(--ink); background:var(--soft); border-radius:8px; padding:8px 10px; white-space:pre-wrap; display:none; }
+  .answer { margin-top:6px; font-size:13px; color:var(--ink); background:var(--soft); border-radius:8px; padding:8px 10px; display:none; }
+  .answer .text { white-space:pre-wrap; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:5; line-clamp:5; overflow:hidden; }
+  .answer .more { display:none; background:none; border:none; padding:0; margin-top:4px; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; }
+  #full { width:650px; height:500px; max-width:calc(100vw - 32px); max-height:calc(100vh - 32px); padding:0; border:none;
+          border-radius:14px; box-shadow:0 12px 40px rgba(0,0,0,.3); color:var(--ink); }
+  #full[open] { display:flex; flex-direction:column; }
+  #full::backdrop { background:rgba(20,28,45,.45); }
+  #full .bar { background:var(--accent); color:#fff; padding:10px 14px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; font-weight:600; }
+  #full .bar button { background:none; border:none; color:#fff; font-size:20px; line-height:1; cursor:pointer; }
+  #full .body { flex:1; overflow:auto; padding:14px 18px; white-space:pre-wrap; font-size:14px; line-height:1.5; }
   .ok { color:#1b7f3b; } .bad { color:#b3261e; }
   section[hidden] { display:none; }
   #fab { position:fixed; right:24px; bottom:24px; width:64px; height:64px; border-radius:50%; border:none;
@@ -152,6 +161,10 @@
   <div class="bar"><span>Помощник по документообороту</span><button id="close" aria-label="Закрыть">×</button></div>
   <iframe id="frame" title="Чат-помощник"></iframe>
 </div>
+<dialog id="full" aria-label="Ответ помощника">
+  <div class="bar"><span class="title"></span><button id="full-close" aria-label="Закрыть">×</button></div>
+  <div class="body"></div>
+</dialog>
 <button id="fab" aria-label="Открыть помощника">💬<span class="hint">Спросить про документооборот</span></button>
 
 <script>
@@ -234,20 +247,35 @@
   }
   document.getElementById('health-refresh').onclick = loadHealth;
 
-  // --- быстрые ответы помощника через REST API
-  const plain = md => md.replace(/\*\*/g, '').replace(/^> ?/gm, '').replace(/_⏱.*$/m, '').trim();
+  // --- быстрые ответы помощника через REST API: в карточке первые 5 строк, весь ответ — в окне «Подробнее»
+  const plain = md => md.replace(/\*\*/g, '').replace(/^> ?/gm, '').replace(/_⏱.*$/m, '')
+    .replace(/(^|[\s(])_([^_\n]+?)_(?=$|[\s.,;:!?)])/gm, '$1$2').replace(/`([^`\n]+)`/g, '$1').trim();
+  const full = document.getElementById('full');
+  const showFull = (title, text) => {
+    full.querySelector('.title').textContent = title;
+    full.querySelector('.body').textContent = text;
+    full.showModal();
+    full.querySelector('.body').scrollTop = 0;
+  };
+  document.getElementById('full-close').onclick = () => full.close();
+  full.onclick = e => { if (e.target === full) full.close(); };   // клик по затемнению вокруг окна
   const bindAsk = root => root.querySelectorAll('[data-ask]').forEach(btn => btn.onclick = async () => {
     const box = btn.parentElement.querySelector('.answer');
     if (box.style.display === 'block') { box.style.display = 'none'; return; }
-    box.style.display = 'block'; box.textContent = 'Помощник ищет ответ…';
+    box.innerHTML = '<div class="text">Помощник ищет ответ…</div><button class="more" type="button">Подробнее</button>';
+    box.style.display = 'block';
+    const el = box.querySelector('.text'), more = box.querySelector('.more');
     try {
       const r = await fetch('/api/ask', {method: 'POST', headers: {'Content-Type': 'application/json'},
                                          body: JSON.stringify({text: btn.dataset.ask, role: 'employee'})});
       const d = await r.json();
-      let text = plain(d.text);
-      if (text.length > 900) text = text.slice(0, 900).replace(/\s\S*$/, '') + ' …';
-      box.innerHTML = esc(text) + (d.sources.length ? '\n\nИсточники: ' + esc(d.sources.map(s => s.label.split(' — ')[0] + (s.relevance != null ? ` (${s.relevance} %)` : '')).join('; ')) : '');
-    } catch (e) { box.textContent = 'Не удалось получить ответ.'; }
+      const text = plain(d.text) + (d.sources.length ? '\n\nИсточники: ' + d.sources.map(s => s.label.split(' — ')[0] + (s.relevance != null ? ` (${s.relevance} %)` : '')).join('; ') : '');
+      el.textContent = text;
+      if (el.scrollHeight > el.clientHeight + 1) {
+        more.style.display = 'inline-block';
+        more.onclick = () => showFull(btn.dataset.ask, text);
+      }
+    } catch (e) { el.textContent = 'Не удалось получить ответ.'; }
   });
   bindAsk(document);
 

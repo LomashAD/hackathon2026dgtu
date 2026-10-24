@@ -171,6 +171,15 @@ async def main(url: str) -> int:
                       "в «Документах» список документов базы знаний и 7 модулей", failures)
             if hash_ == "#services":
                 check("работает" in await wpage.inner_text("#health"), "в «Сервисах» статус системы", failures)
+            if hash_ == "#dou":
+                await wpage.locator("#tab-dou [data-ask]").first.click()
+                more = wpage.locator("#tab-dou .answer .more").first
+                await more.wait_for(state="visible", timeout=60000)
+                await more.click()
+                opened = await wpage.locator("#full[open]").count() == 1
+                check(opened and len(await wpage.inner_text("#full .body")) > 200,
+                      "частый вопрос: 5 строк в карточке, «Подробнее» открывает весь ответ", failures)
+                await wpage.click("#full-close")
         await browser.close()
 
     check(not external, f"нет запросов к внешним хостам (найдено: {external[:3]})", failures)
