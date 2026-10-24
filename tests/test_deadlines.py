@@ -312,6 +312,12 @@ def test_dialog_no_term_honest_refusal(eng):
     assert r.refused and "лингвистической экспертизы в базе знаний не указан" in r.text
 
 
+def test_dialog_out_of_scope_not_calc(eng):
+    """Не о документах — не калькулятор: обычный ответ по базе знаний (с отказом), а не вопрос о виде документа."""
+    from app.dialog.engine import Session
+    assert eng.deadline_calc(Session(), "Когда будет готова справка о зарплате, если подам заявление сегодня?") is None
+
+
 def test_dialog_execution_and_signing(eng):
     _, r = _ask(eng, "до какого числа надо ответить на обращение гражданина, если его зарегистрировали 12 ноября 2026")
     assert "пт, 11.12.2026" in r.text and "сб, 12.12.2026 — это нерабочий день" in r.text

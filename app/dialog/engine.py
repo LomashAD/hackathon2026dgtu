@@ -663,6 +663,10 @@ class Engine:
         got = self._calc_read(s, text, raw, today)
         if followup and not got:
             return None
+        # Ни этапа, ни вида документа («когда будет готова справка о зарплате?») — не о сроках документооборота:
+        # обычный ответ по базе знаний (там — честный отказ), а не уточняющий вопрос о виде документа
+        if base is None and not {"stage", "doc", "sender", "urgency"} & got.keys():
+            return None
         calc = {**(base or {}), **got}
         calc.setdefault("query", text)
         stage = calc.setdefault("stage", "approval")
