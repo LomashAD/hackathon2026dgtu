@@ -24,6 +24,7 @@ paths:
   index_dir: storage/chroma
   registry: storage/registry.json
   matrix: storage/matrix.json
+  calendar: app/approval/calendar_ru.yaml   # производственный календарь РФ для сроков в рабочих днях (заменяемый)
   output_dir: storage/output
   audit_log: storage/logs/audit.jsonl
   feedback_log: storage/logs/feedback.jsonl
