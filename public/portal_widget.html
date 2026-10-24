@@ -17,15 +17,19 @@
           --line:#2c3542; --soft:#1f2b3c; --ok:#5cc27f; --bad:#f2857d; color-scheme:dark; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:var(--brand); color:var(--accent-ink); padding:0 64px 0 24px; display:flex; gap:28px; align-items:center; flex-wrap:wrap; position:relative; }
-  #theme { position:absolute; right:14px; top:8px; width:36px; height:36px; border-radius:50%; border:none; background:none;
+  header { background:var(--brand); color:var(--accent-ink); padding:0 14px 0 24px; display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+  .tools { margin-left:auto; display:flex; align-items:center; gap:6px; font-size:13px; }
+  #me-name { opacity:.9; margin-right:4px; white-space:nowrap; max-width:240px; overflow:hidden; text-overflow:ellipsis; }
+  #logout { background:rgba(255,255,255,.14); color:var(--accent-ink); border:none; border-radius:6px; padding:6px 10px; font:inherit; cursor:pointer; }
+  #logout:hover { background:rgba(255,255,255,.24); }
+  #theme { width:36px; height:36px; border-radius:50%; border:none; background:none;
            color:var(--accent-ink); cursor:pointer; display:grid; place-items:center; }
   #theme:hover { background:rgba(255,255,255,.14); }
   #theme svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   :root[data-theme="dark"] #theme .i-sun, :root:not([data-theme="dark"]) #theme .i-moon { display:none; }
   header b { font-size:18px; padding:14px 0; }
   nav { display:flex; gap:4px; flex-wrap:wrap; }
-  nav a { color:var(--accent-ink); text-decoration:none; font-size:14px; padding:16px 12px; opacity:.85; border-bottom:3px solid transparent; }
+  nav a { color:var(--accent-ink); text-decoration:none; font-size:14px; padding:16px 10px; opacity:.85; border-bottom:3px solid transparent; }
   nav a:hover { opacity:1; background:rgba(255,255,255,.08); }
   nav a.active { opacity:1; border-bottom-color:#fff; font-weight:600; }
   main { max-width:1100px; margin:24px auto; padding:0 16px; }
@@ -57,6 +61,16 @@
   #full .bar button { background:none; border:none; color:#fff; font-size:20px; line-height:1; cursor:pointer; }
   #full .body { flex:1; overflow:auto; padding:14px 18px; white-space:pre-wrap; font-size:14px; line-height:1.5; }
   .ok { color:var(--ok); } .bad { color:var(--bad); }
+  input, select { font:inherit; font-size:14px; padding:7px 9px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); }
+  .form-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .form-row input { flex:1 1 170px; min-width:0; }
+  .form-row .btn { margin-top:0; }
+  .notice { margin-top:12px; padding:10px 12px; border-radius:8px; background:var(--soft); font-size:14px; }
+  .notice code { font-size:15px; font-weight:700; letter-spacing:.5px; }
+  button.link { background:none; border:none; padding:0; margin-right:12px; color:var(--accent); cursor:pointer; font:inherit; font-size:13px; white-space:nowrap; }
+  button.link.danger { color:var(--bad); }
+  button.link:disabled { color:var(--muted); cursor:default; }
+  .scroll { overflow-x:auto; }
   section[hidden] { display:none; }
   #fab { position:fixed; right:24px; bottom:24px; width:64px; height:64px; border-radius:50%; border:none;
          background:var(--brand); color:#fff; font-size:28px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.25); }
@@ -71,8 +85,9 @@
   #panel iframe { border:0; flex:1; width:100%; }
   @media (max-width: 700px) {
     .grid { grid-template-columns:1fr; } nav a { padding:10px 8px; }
+    header { row-gap:0; } nav { order:3; flex-basis:100%; } #me-name { display:none; }
     #panel { right:8px; left:8px; width:auto; bottom:96px; } #fab .hint { display:none; }
-    th:nth-child(3), td:nth-child(3) { display:none; }
+    #tab-docs th:nth-child(3), #tab-docs td:nth-child(3) { display:none; }
   }
 </style>
 </head>
@@ -84,11 +99,16 @@
     <a href="#docs" data-tab="docs">Документы</a>
     <a href="#services" data-tab="services">Сервисы</a>
     <a href="#dou" data-tab="dou">Раздел Департамента ДОУ</a>
+    <a href="#users" data-tab="users" id="nav-users" hidden>Пользователи</a>
   </nav>
+  <div class="tools">
+  <span id="me-name"></span>
+  <button id="logout" type="button">Выйти</button>
   <button id="theme" type="button">
     <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
     <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
   </button>
+  </div>
 </header>
 
 <main>
@@ -174,6 +194,32 @@
       </div>
     </div>
   </section>
+
+  <!-- Пользователи (администратор) -->
+  <section id="tab-users" hidden>
+    <h1>Пользователи</h1>
+    <div class="card">
+      <h2>Новая учётная запись</h2>
+      <form id="user-add" class="form-row">
+        <input name="login" placeholder="Логин (латиницей, например ivanov)" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+        <input name="name" placeholder="ФИО, например Иванов И. И." autocomplete="off" required>
+        <select name="role" id="user-role"></select>
+        <button class="btn" type="submit">Создать</button>
+      </form>
+      <p class="note">Пароль сгенерируется автоматически и будет показан один раз — передайте его сотруднику.</p>
+      <div id="user-msg" class="notice" hidden></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h2>Учётные записи</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Логин</th><th>ФИО</th><th>Роль</th><th>Статус</th><th></th></tr></thead>
+          <tbody id="users-body"><tr><td colspan="5" class="note">Загрузка…</td></tr></tbody>
+        </table>
+      </div>
+      <p class="note">Смена роли и блокировка действуют сразу. После сброса пароля сотрудник выходит из всех сессий и входит с новым паролем.</p>
+    </div>
+  </section>
 </main>
 
 <div id="panel" role="dialog" aria-label="Помощник по документообороту">
@@ -230,10 +276,102 @@
     if (name === 'docs' && !loaded.docs) { loaded.docs = true; loadDocs(); }
     if (name === 'services') loadHealth();
     if (name === 'dou' && !loaded.dou) { loaded.dou = true; loadDouList(); }
+    if (name === 'users') loadUsers();
   }
   window.addEventListener('hashchange', show);
 
-  async function getJSON(url) { const r = await fetch(url); if (!r.ok) throw new Error(r.status); return r.json(); }
+  // --- запросы к API: без входа (или после блокировки и смены пароля) — на страницу входа
+  const toLogin = () => location.replace('/login?next=' + encodeURIComponent(location.pathname + location.hash));
+  async function api(method, url, body) {
+    const r = await fetch(url, body === undefined ? {method} : {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    if (r.status === 401) { toLogin(); throw new Error('нужен вход'); }
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || r.status);
+    return d;
+  }
+  const getJSON = url => api('GET', url);
+
+  let me = null;
+  async function loadMe() {
+    me = await getJSON('/api/me');
+    const el = document.getElementById('me-name');
+    el.textContent = me.name.includes(me.role_title) ? me.name : `${me.name} · ${me.role_title}`;
+    el.title = `${me.login} · ${me.role_title}`;
+    document.getElementById('nav-users').hidden = !me.can_manage_users;
+  }
+  document.getElementById('logout').onclick = async () => {
+    try { await fetch('/logout', {method: 'POST'}); } finally { location.replace('/login'); }
+  };
+
+  let roleList = [];
+  async function loadUsers() {
+    const body = document.getElementById('users-body');
+    try {
+      const d = await getJSON('/api/admin/users');
+      roleList = d.roles;
+      const sel = document.getElementById('user-role');
+      if (!sel.options.length) sel.innerHTML = roleList.map(r => `<option value="${esc(r.id)}">${esc(r.title)}</option>`).join('');
+      body.innerHTML = d.users.map(u => {
+        const self = me && u.login === me.login;
+        const roles = roleList.map(r => `<option value="${esc(r.id)}"${r.id === u.role ? ' selected' : ''}>${esc(r.title)}</option>`).join('');
+        return `<tr data-login="${esc(u.login)}">
+          <td><b>${esc(u.login)}</b>${self ? '<span class="tag">вы</span>' : ''}</td><td>${esc(u.name)}</td>
+          <td><select data-act="role"${self ? ' disabled title="Свою роль сменить нельзя"' : ''}>${roles}</select></td>
+          <td>${u.disabled ? '<span class="bad">заблокирован</span>' : '<span class="ok">активен</span>'}</td>
+          <td style="white-space:nowrap"><button class="link" data-act="password">Сбросить пароль</button>
+            <button class="link" data-act="${u.disabled ? 'unblock' : 'block'}"${self ? ' disabled' : ''}>${u.disabled ? 'Разблокировать' : 'Заблокировать'}</button>
+            <button class="link danger" data-act="remove"${self ? ' disabled' : ''}>Удалить</button></td></tr>`;
+      }).join('');
+    } catch (e) { body.innerHTML = `<tr><td colspan="5" class="bad">Не удалось загрузить список (${esc(e.message)})</td></tr>`; }
+  }
+
+  const userMsg = (html, bad) => { const m = document.getElementById('user-msg'); m.hidden = false; m.className = 'notice' + (bad ? ' bad' : ''); m.innerHTML = html; };
+  const showPassword = (login, password) => {
+    userMsg(`Учётная запись <b>${esc(login)}</b>: пароль <code>${esc(password)}</code> — показывается один раз.
+      <button class="link" type="button" id="copy-pw">Скопировать</button>`);
+    document.getElementById('copy-pw').onclick = e => navigator.clipboard.writeText(password).then(() => e.target.textContent = 'Скопировано');
+  };
+
+  document.getElementById('user-add').onsubmit = async e => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    try {
+      const d = await api('POST', '/api/admin/users', {login: f.get('login'), name: f.get('name'), role: f.get('role')});
+      e.target.reset();
+      showPassword(d.login, d.password);
+      loadUsers();
+    } catch (err) { userMsg(esc(err.message), true); }
+  };
+
+  document.getElementById('users-body').addEventListener('click', async e => {
+    const b = e.target.closest('button[data-act]');
+    if (!b) return;
+    const login = b.closest('tr').dataset.login, act = b.dataset.act, url = '/api/admin/users/' + encodeURIComponent(login);
+    try {
+      if (act === 'password') {
+        if (!confirm(`Сбросить пароль ${login}? Сотрудник выйдет из всех сессий.`)) return;
+        const d = await api('POST', url + '/password');
+        if (login === me.login) { alert(`Ваш новый пароль: ${d.password}\nВойдите с ним заново.`); toLogin(); return; }
+        showPassword(login, d.password);
+      } else if (act === 'block' || act === 'unblock') {
+        await api('PATCH', url, {disabled: act === 'block'});
+        userMsg(`${esc(login)}: ${act === 'block' ? 'заблокирован' : 'разблокирован'}.`);
+      } else if (act === 'remove') {
+        if (!confirm(`Удалить учётную запись ${login}?`)) return;
+        await api('DELETE', url);
+        userMsg(`Учётная запись ${esc(login)} удалена.`);
+      }
+      loadUsers();
+    } catch (err) { userMsg(esc(err.message), true); }
+  });
+  document.getElementById('users-body').addEventListener('change', async e => {
+    if (e.target.dataset.act !== 'role') return;
+    const login = e.target.closest('tr').dataset.login;
+    try {
+      const d = await api('PATCH', '/api/admin/users/' + encodeURIComponent(login), {role: e.target.value});
+      userMsg(`${esc(login)}: роль «${esc(d.user.role_title)}».`);
+    } catch (err) { userMsg(esc(err.message), true); loadUsers(); }
+  });
 
   async function loadNews() {
     const el = document.getElementById('news-body');
@@ -308,9 +446,7 @@
     box.style.display = 'block';
     const el = box.querySelector('.text'), more = box.querySelector('.more');
     try {
-      const r = await fetch('/api/ask', {method: 'POST', headers: {'Content-Type': 'application/json'},
-                                         body: JSON.stringify({text: btn.dataset.ask, role: 'employee'})});
-      const d = await r.json();
+      const d = await api('POST', '/api/ask', {text: btn.dataset.ask});
       const text = plain(d.text) + (d.sources.length ? '\n\nИсточники: ' + d.sources.map(s => s.label.split(' — ')[0] + (s.relevance != null ? ` (${s.relevance} %)` : '')).join('; ') : '');
       el.textContent = text;
       if (el.scrollHeight > el.clientHeight + 1) {
@@ -321,7 +457,7 @@
   });
   bindAsk(document);
 
-  show();
+  loadMe().then(show, show);
 </script>
 </body>
 </html>

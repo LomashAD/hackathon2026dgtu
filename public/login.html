@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вход — Внутренний портал</title>
+<script>
+  // Тема до первой отрисовки: выбор кнопкой ☀/☾ (общий с порталом и чатом) или тема системы
+  (() => { let t = null; try { t = localStorage.getItem('vite-ui-theme'); } catch (e) {}
+    document.documentElement.dataset.theme = t === 'light' || t === 'dark' ? t
+      : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; })();
+</script>
+<style>
+  :root { --bg:#f4f6f9; --card:#fff; --ink:#1d2433; --muted:#5b6475; --brand:#1f5fae; --line:#dde3ec; --bad:#b3261e; color-scheme:light; }
+  :root[data-theme="dark"] { --bg:#11151c; --card:#1a2029; --ink:#e6e9ef; --muted:#a3acbb; --brand:#2a64ad; --line:#2c3542; --bad:#f2857d; color-scheme:dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column; font-family:system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+         background:var(--bg); color:var(--ink); }
+  header { background:var(--brand); color:#fff; padding:14px 64px 14px 24px; position:relative; font-size:18px; font-weight:700; }
+  #theme { position:absolute; right:14px; top:8px; width:36px; height:36px; border-radius:50%; border:none; background:none; color:#fff;
+           cursor:pointer; display:grid; place-items:center; }
+  #theme:hover { background:rgba(255,255,255,.14); }
+  #theme svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  :root[data-theme="dark"] #theme .i-sun, :root:not([data-theme="dark"]) #theme .i-moon { display:none; }
+  main { flex:1; display:grid; place-items:center; padding:24px 16px; }
+  form { width:100%; max-width:360px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:24px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .note { font-size:13px; color:var(--muted); margin:0 0 18px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
+  input { width:100%; font:inherit; font-size:15px; padding:9px 11px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); }
+  input:focus { outline:2px solid var(--brand); outline-offset:-1px; }
+  button[type=submit] { width:100%; margin-top:18px; padding:10px; font:inherit; font-weight:600; color:#fff; background:var(--brand);
+                        border:none; border-radius:8px; cursor:pointer; }
+  button[type=submit]:disabled { opacity:.6; cursor:default; }
+  #error { color:var(--bad); font-size:13px; margin-top:12px; min-height:1em; }
+</style>
+</head>
+<body>
+<header>Внутренний портал Организации
+  <button id="theme" type="button">
+    <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+    <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+  </button>
+</header>
+<main>
+  <form id="form">
+    <h1>Вход</h1>
+    <p class="note">Учётную запись выдаёт администратор портала.</p>
+    <label for="login">Логин</label>
+    <input id="login" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+    <label for="password">Пароль</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit">Войти</button>
+    <div id="error" role="alert"></div>
+  </form>
+</main>
+<script>
+  const KEY = 'vite-ui-theme', sysDark = matchMedia('(prefers-color-scheme: dark)'), btn = document.getElementById('theme');
+  const sysTheme = () => sysDark.matches ? 'dark' : 'light';
+  function applyTheme() {
+    let t = null; try { t = localStorage.getItem(KEY); } catch (e) {}
+    const cur = t === 'light' || t === 'dark' ? t : sysTheme();
+    document.documentElement.dataset.theme = cur;
+    btn.title = cur === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему';
+    btn.setAttribute('aria-label', btn.title);
+  }
+  btn.onclick = () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem(KEY, next === sysTheme() ? 'system' : next); } catch (e) {}
+    document.documentElement.dataset.theme = next;
+    applyTheme();
+  };
+  sysDark.addEventListener('change', applyTheme);
+  applyTheme();
+
+  // После входа — на страницу, с которой пришли (только адрес этого же сайта)
+  const raw = new URLSearchParams(location.search).get('next') || '/';
+  const next = /^\/(?![\/\\])/.test(raw) ? raw : '/';
+  const form = document.getElementById('form'), err = document.getElementById('error');
+  form.onsubmit = async e => {
+    e.preventDefault();
+    err.textContent = '';
+    const submit = form.querySelector('button[type=submit]');
+    submit.disabled = true;
+    try {
+      const r = await fetch('/login', {method: 'POST', body: new URLSearchParams(new FormData(form)),
+                                       headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
+      if (r.ok) { location.replace(next); return; }
+      err.textContent = r.status === 401
+        ? 'Неверный логин или пароль. После нескольких неудачных попыток подряд вход на время закрывается.'
+        : `Не удалось войти (ошибка ${r.status}).`;
+    } catch (e) { err.textContent = 'Сервер недоступен.'; }
+    submit.disabled = false;
+  };
+</script>
+</body>
+</html>

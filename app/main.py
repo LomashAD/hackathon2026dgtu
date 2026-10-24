@@ -17,9 +17,9 @@ import chainlit as cl  # noqa: E402
 from chainlit.input_widget import Switch  # noqa: E402
 
 from app.api import install_routes  # noqa: E402
-from app.config import get_config, path  # noqa: E402
+from app.config import path  # noqa: E402
 from app.dialog.engine import Reply, Session, get_engine  # noqa: E402
-from app.security import audit  # noqa: E402
+from app.security import audit, users  # noqa: E402
 from app.security.access import can_view_archive, roles  # noqa: E402
 
 path("app_log").parent.mkdir(parents=True, exist_ok=True)
@@ -29,29 +29,42 @@ for noisy in ("httpx", "chromadb", "httpcore"):
     logging.getLogger(noisy).setLevel(logging.WARNING)
 
 install_routes()
-CFG = get_config()
+users.ensure_auth_secret()
+RELOGIN = "Сессия завершена: учётная запись заблокирована или пароль изменён. Войдите заново."
 
 
-@cl.set_chat_profiles
-async def chat_profiles():
-    # Роль выбирается в UI (в продакшне приходит из SSO)
-    icons = {"employee": "👤", "expert": "🎓", "admin": "🛠"}
-    return [cl.ChatProfile(name=r["title"], markdown_description=f"Роль **{key}**: уровни доступа "
-                           f"{', '.join(r['levels'])}", default=(key == CFG["default_role"]),
-                           icon=None) for key, r in roles().items()]
+@cl.password_auth_callback
+async def auth(username: str, password: str) -> cl.User | None:
+    # Вход по учётной записи сотрудника; роль в токен не пишем — она читается из учётной записи
+    acc = await asyncio.to_thread(users.authenticate, username, password)
+    audit.log_login(username, acc is not None)
+    if acc is None:
+        return None
+    return cl.User(identifier=acc["login"], display_name=acc["name"], metadata={"pwv": acc["pwv"]})
 
 
-def _role_from_profile(profile: str | None) -> str:
-    for key, r in roles().items():
-        if r["title"] == profile:
-            return key
-    return CFG["default_role"]
+def _account() -> dict | None:
+    user = cl.user_session.get("user")
+    return users.session_account(user.identifier, (user.metadata or {}).get("pwv")) if user else None
+
+
+def _session() -> Session | None:
+    """Сессия диалога, если учётная запись ещё действует; роль — текущая из учётной записи."""
+    s, acc = cl.user_session.get("session"), _account()
+    if s is None or acc is None:
+        return None
+    s.role = acc["role"]
+    return s
 
 
 @cl.on_chat_start
 async def start():
-    role = _role_from_profile(cl.user_session.get("chat_profile"))
-    s = Session(role=role, user=f"demo-{role}")
+    acc = _account()
+    if acc is None:
+        await cl.Message(content=RELOGIN).send()
+        return
+    role = acc["role"]
+    s = Session(role=role, user=acc["login"])
     cl.user_session.set("session", s)
     if can_view_archive(role):
         await cl.ChatSettings([Switch(id="archive", label="Искать также в архивных редакциях", initial=False)]).send()
@@ -62,8 +75,9 @@ async def start():
 
 @cl.on_settings_update
 async def settings_update(settings):
-    s: Session = cl.user_session.get("session")
-    s.include_archived = bool(settings.get("archive"))
+    s = _session()
+    if s is not None:
+        s.include_archived = bool(settings.get("archive")) and can_view_archive(s.role)
 
 
 async def _send(reply: Reply) -> None:
@@ -105,7 +119,10 @@ async def on_show_sources(action: cl.Action):
 
 
 async def _process(text: str, file: Path | None = None) -> None:
-    s: Session = cl.user_session.get("session")
+    s = _session()
+    if s is None:
+        await cl.Message(content=RELOGIN).send()
+        return
     cl.user_session.set("last_query", text)
     async with cl.Step(name="Поиск по базе знаний", type="tool") as step:
         reply = await asyncio.to_thread(get_engine().handle, s, text, file)
@@ -140,7 +157,9 @@ async def on_quick(action: cl.Action):
 
 @cl.action_callback("feedback")
 async def on_feedback(action: cl.Action):
-    s: Session = cl.user_session.get("session")
+    s = _session()
+    if s is None:
+        return
     audit.log_feedback(s.user, s.id, cl.user_session.get("last_query") or "", action.payload["v"])
     await action.remove()
     await cl.Message(content="Спасибо за оценку!" if action.payload["v"] == "up" else

@@ -2,14 +2,16 @@
 """Сквозной прогон демо-сценария (раздел 8 PLAN.md) через реальный веб-интерфейс в Chrome (Playwright).
 
 Требует: запущенное приложение (./run.sh) и `pip install playwright` (в отдельном окружении, это dev-инструмент).
+Входит под учётной записью сотрудника (пароль печатает ./run.sh при первом запуске или `scripts/users.py passwd`).
 Сохраняет скриншоты в docs/screenshots/ и проверяет, что браузер не делает запросов к внешним хостам.
 
-  python tests/ui_demo.py [--url http://localhost:8000]
+  python tests/ui_demo.py --password <пароль> [--login sotrudnik] [--url http://localhost:8000]
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import re
 import sys
 from pathlib import Path
@@ -73,7 +75,7 @@ def check(cond: bool, msg: str, failures: list[str]) -> None:
         failures.append(msg)
 
 
-async def main(url: str) -> int:
+async def main(url: str, login: str, password: str) -> int:
     SHOTS.mkdir(parents=True, exist_ok=True)
     failures: list[str] = []
     external: list[str] = []
@@ -83,7 +85,12 @@ async def main(url: str) -> int:
         page = await ctx.new_page()
         local = re.compile(r"^(https?|wss?)://(localhost|127\.0\.0\.1)|^(data|blob):")
         page.on("request", lambda r: external.append(r.url) if not local.match(r.url) else None)
-        await page.goto(url.rstrip("/") + "/?chat", wait_until="networkidle")
+        await page.goto(url.rstrip("/") + "/login?next=%2F%3Fchat", wait_until="networkidle")
+        await page.fill("#login", login)
+        await page.fill("#password", password)
+        await page.click("button[type=submit]")
+        await page.wait_for_url(re.compile(r".*\?chat$"), timeout=15000)
+        await page.wait_for_load_state("networkidle")
         await page.wait_for_timeout(1500)
         chat = Chat(page)
 
@@ -203,4 +210,7 @@ async def main(url: str) -> int:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://localhost:8000")
-    sys.exit(asyncio.run(main(ap.parse_args().url)))
+    ap.add_argument("--login", default="sotrudnik")
+    ap.add_argument("--password", default=os.environ.get("DEMO_PASSWORD"), required="DEMO_PASSWORD" not in os.environ)
+    args = ap.parse_args()
+    sys.exit(asyncio.run(main(args.url, args.login, args.password)))

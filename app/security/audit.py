@@ -36,3 +36,11 @@ def log_unanswered(role: str, query: str, best: float) -> None:
 def log_feedback(user: str, session: str, query: str, value: str, comment: str = "") -> None:
     _write("feedback_log", {"user": user, "session": session, "query": _m(query), "value": value,
                             "comment": _m(comment)})
+
+
+def log_login(login: str, ok: bool) -> None:
+    _write("audit_log", {"event": "login" if ok else "login_failed", "user": _m(login)[:64]})
+
+
+def log_admin(actor: str, action: str, target: str) -> None:
+    _write("audit_log", {"event": f"admin:{action}", "user": actor, "target": target})

@@ -41,6 +41,8 @@ done
 echo "→ проверяю базу знаний"
 .venv/bin/python scripts/ingest.py --all | sed 's/^/   /'
 [ -f samples/Черновик_с_ошибками.docx ] || .venv/bin/python scripts/make_demo_draft.py >/dev/null
+echo "→ проверяю учётные записи"
+.venv/bin/python scripts/users.py init | sed 's/^/   /'
 
 echo "→ http://localhost:$PORT  (макет портала с виджетом)   http://localhost:$PORT/?chat  (чат)"
 exec .venv/bin/chainlit run app/main.py --host "$HOST" --port "$PORT" --headless

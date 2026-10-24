@@ -28,6 +28,8 @@ paths:
   templates_yaml: templates_yaml
   templates_docx: storage/templates_docx
   news: news.yaml                     # новости портала, правятся без кода
+  users: storage/users.json           # учётные записи сотрудников (scripts/users.py, вкладка «Пользователи»)
+  auth_secret: storage/auth_secret    # секрет подписи токенов входа (создаётся при первом запуске)
 
 # Коллекции источников базы знаний. Новый документ = новая запись здесь
 # (или scripts/ingest.py --doc ... --parser ...), код не меняется.
@@ -62,7 +64,7 @@ sources:
     effective_date: "2026-11-01"
     access_level: internal
 
-# Уровни доступа (по возрастанию) и роли. В продакшне роль приходит из SSO.
+# Уровни доступа (по возрастанию) и роли. Роль задаётся в учётной записи сотрудника (в продакшне — из SSO).
 access_levels: [public, internal, confidential]
 roles:
   employee:
@@ -75,6 +77,7 @@ roles:
     title: Администратор
     levels: [public, internal, confidential]
     can_view_archive: true
+    can_manage_users: true             # вкладка «Пользователи» на портале
 default_role: employee
 
 retrieval:
@@ -115,6 +118,9 @@ contacts:
 security:
   mask_pii_in_logs: true
   max_message_chars: 2000
+  password_min_length: 8
+  login_max_failures: 5              # неудачных попыток входа подряд…
+  login_lock_minutes: 5              # …после которых вход по логину закрыт на столько минут
 
 ui:
   title: Помощник по документообороту
