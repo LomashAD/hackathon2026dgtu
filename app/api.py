@@ -36,6 +36,11 @@ class UserIn(BaseModel):
     login: str
     name: str
     role: str
+    password: str | None = None     # пусто — сгенерируется
+
+
+class PasswordIn(BaseModel):
+    password: str | None = None     # пусто — сгенерируется
 
 
 class UserPatch(BaseModel):
@@ -199,7 +204,7 @@ def admin_users(_: dict = Depends(admin)):
 
 @router.post("/api/admin/users")
 def admin_add(body: UserIn, acc: dict = Depends(admin)):
-    password = _user_op(users.add, body.login, body.name, body.role)
+    password = _user_op(users.add, body.login, body.name, body.role, body.password or None)
     audit.log_admin(acc["login"], "add", body.login)
     return {"login": users.norm_login(body.login), "password": password}
 
@@ -215,8 +220,8 @@ def admin_update(login: str, body: UserPatch, acc: dict = Depends(admin)):
 
 
 @router.post("/api/admin/users/{login}/password")
-def admin_password(login: str, acc: dict = Depends(admin)):
-    password = _user_op(users.set_password, login)
+def admin_password(login: str, body: PasswordIn | None = None, acc: dict = Depends(admin)):
+    password = _user_op(users.set_password, login, (body.password if body else None) or None)
     audit.log_admin(acc["login"], "password", login)
     return {"password": password}
 

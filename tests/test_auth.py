@@ -107,3 +107,12 @@ def test_api_access(users):
     assert adm.post("/api/admin/users/sotrudnik/password").status_code == 200
     assert emp.get("/api/me").status_code == 401          # пароль сменён — старый токен не действует
     assert adm.delete("/api/admin/users/ivanov").status_code == 200
+
+    # пароль задаёт администратор: при создании и при смене; короткий — отказ
+    r = adm.post("/api/admin/users", json={"login": "petrova", "name": "Петрова П. П.", "role": "employee", "password": "Moy-parol-2026"})
+    assert r.json()["password"] == "Moy-parol-2026" and users.authenticate("petrova", "Moy-parol-2026")
+    assert adm.post("/api/admin/users", json={"login": "sidorov", "name": "С", "role": "employee", "password": "123"}).status_code == 400
+    assert adm.post("/api/admin/users/petrova/password", json={"password": "short"}).status_code == 400
+    assert adm.post("/api/admin/users/petrova/password", json={"password": "Novyi-parol-77"}).json()["password"] == "Novyi-parol-77"
+    assert users.authenticate("petrova", "Novyi-parol-77") and not users.authenticate("petrova", "Moy-parol-2026")
+    assert len(adm.post("/api/admin/users/petrova/password", json={"password": ""}).json()["password"]) == 12   # пусто — сгенерирован

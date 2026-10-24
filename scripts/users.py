@@ -5,19 +5,28 @@
   python scripts/users.py init                                   # первые записи admin и sotrudnik, если записей нет
   python scripts/users.py list
   python scripts/users.py add ivanov --name "Иванов И. И." --role employee   # пароль сгенерируется и напечатается
-  python scripts/users.py passwd admin                           # новый пароль (прежние сессии завершаются)
+  python scripts/users.py add ivanov --name "Иванов И. И." --ask              # пароль ввести самому (не попадёт в историю)
+  python scripts/users.py passwd admin [--ask]                   # новый пароль (прежние сессии завершаются)
   python scripts/users.py role ivanov admin
   python scripts/users.py block ivanov  |  unblock ivanov  |  remove ivanov
 """
 from __future__ import annotations
 
 import argparse
+import getpass
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.security import users  # noqa: E402
+
+
+def _ask() -> str:
+    pw = getpass.getpass("Пароль: ")
+    if pw != getpass.getpass("Ещё раз: "):
+        raise users.UserError("Пароли не совпадают")
+    return pw
 
 
 def main() -> int:
@@ -29,7 +38,10 @@ def main() -> int:
     a.add_argument("login")
     a.add_argument("--name", required=True)
     a.add_argument("--role", default="employee")
-    sub.add_parser("passwd").add_argument("login")
+    a.add_argument("--ask", action="store_true", help="ввести пароль, а не генерировать")
+    pw = sub.add_parser("passwd")
+    pw.add_argument("login")
+    pw.add_argument("--ask", action="store_true", help="ввести пароль, а не генерировать")
     r = sub.add_parser("role")
     r.add_argument("login")
     r.add_argument("role")
@@ -50,9 +62,11 @@ def main() -> int:
             for u in users.list_users():
                 print(f"{u['login']:<20} {u['role_title']:<16} {'заблокирован' if u['disabled'] else 'активен':<13} {u['name']}")
         elif args.cmd == "add":
-            print(f"Создана учётная запись {users.norm_login(args.login)}, пароль {users.add(args.login, args.name, args.role)}")
+            password = users.add(args.login, args.name, args.role, _ask() if args.ask else None)
+            print(f"Создана учётная запись {users.norm_login(args.login)}" + ("" if args.ask else f", пароль {password}"))
         elif args.cmd == "passwd":
-            print(f"Новый пароль {users.norm_login(args.login)}: {users.set_password(args.login)}")
+            password = users.set_password(args.login, _ask() if args.ask else None)
+            print(f"Пароль {users.norm_login(args.login)} изменён" + ("" if args.ask else f": {password}"))
         elif args.cmd == "role":
             print(f"Роль {args.login}: {users.update(args.login, role=args.role)['role_title']}")
         elif args.cmd in ("block", "unblock"):
