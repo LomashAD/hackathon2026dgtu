@@ -27,8 +27,10 @@ paths:
   app_log: storage/logs/app.log
   templates_yaml: templates_yaml
   templates_docx: storage/templates_docx
-  news: news.yaml                     # новости портала, правятся без кода
-  users: storage/users.json           # учётные записи сотрудников (scripts/users.py, вкладка «Пользователи»)
+  news: storage/news.yaml             # новости портала (правятся в админ-панели)
+  news_seed: news.yaml                # начальное наполнение: копируется в storage при первом запуске
+  uploads: data/uploads               # новые редакции, загруженные через админ-панель
+  users: storage/users.json           # учётные записи сотрудников (scripts/users.py, админ-панель)
   auth_secret: storage/auth_secret    # секрет подписи токенов входа (создаётся при первом запуске)
 
 # Коллекции источников базы знаний. Новый документ = новая запись здесь
@@ -70,14 +72,11 @@ roles:
   employee:
     title: Сотрудник
     levels: [public, internal]
-  expert:
-    title: Эксперт ДОУ
-    levels: [public, internal, confidential]
   admin:
     title: Администратор
     levels: [public, internal, confidential]
     can_view_archive: true
-    can_manage_users: true             # вкладка «Пользователи» на портале
+    can_manage_users: true             # админ-панель на портале
 default_role: employee
 
 retrieval:

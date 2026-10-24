@@ -38,9 +38,30 @@ def log_feedback(user: str, session: str, query: str, value: str, comment: str =
                             "comment": _m(comment)})
 
 
+def log_event(event: str, user: str, **fields) -> None:
+    """Событие безопасности в аудит-лог: вход, смена пароля, действие администратора."""
+    _write("audit_log", {"event": event, "user": user, **fields})
+
+
 def log_login(login: str, ok: bool) -> None:
-    _write("audit_log", {"event": "login" if ok else "login_failed", "user": _m(login)[:64]})
+    log_event("login" if ok else "login_failed", _m(login)[:64])
 
 
 def log_admin(actor: str, action: str, target: str) -> None:
-    _write("audit_log", {"event": f"admin:{action}", "user": actor, "target": target})
+    log_event(f"admin:{action}", actor, target=target)
+
+
+def read(key: str) -> list[dict]:
+    """Записи журнала (audit_log, unanswered_log, feedback_log), свежие первыми."""
+    p = path(key)
+    if not p.exists():
+        return []
+    out = []
+    with _lock:
+        lines = p.read_text(encoding="utf-8").splitlines()
+    for line in reversed(lines):
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue
+    return out

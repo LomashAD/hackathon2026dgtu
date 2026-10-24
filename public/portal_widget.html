@@ -16,10 +16,13 @@
   :root[data-theme="dark"] { --bg:#11151c; --card:#1a2029; --ink:#e6e9ef; --muted:#a3acbb; --accent:#7fb0f0; --brand:#2a64ad;
           --line:#2c3542; --soft:#1f2b3c; --ok:#5cc27f; --bad:#f2857d; color-scheme:dark; }
   * { box-sizing: border-box; }
+  [hidden] { display:none !important; }   /* иначе .btn { display:inline-block } показывает скрытые кнопки */
   body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); }
   header { background:var(--brand); color:var(--accent-ink); padding:0 14px 0 24px; display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
   .tools { margin-left:auto; display:flex; align-items:center; gap:6px; font-size:13px; }
-  #me-name { opacity:.9; margin-right:4px; white-space:nowrap; max-width:240px; overflow:hidden; text-overflow:ellipsis; }
+  #me-name { background:none; border:none; color:var(--accent-ink); font:inherit; cursor:pointer; padding:6px 6px; border-radius:6px;
+             opacity:.95; margin-right:2px; white-space:nowrap; max-width:240px; overflow:hidden; text-overflow:ellipsis; }
+  #me-name:hover { background:rgba(255,255,255,.14); }
   #logout { background:rgba(255,255,255,.14); color:var(--accent-ink); border:none; border-radius:6px; padding:6px 10px; font:inherit; cursor:pointer; }
   #logout:hover { background:rgba(255,255,255,.24); }
   #theme { width:36px; height:36px; border-radius:50%; border:none; background:none;
@@ -28,10 +31,10 @@
   #theme svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   :root[data-theme="dark"] #theme .i-sun, :root:not([data-theme="dark"]) #theme .i-moon { display:none; }
   header b { font-size:18px; padding:14px 0; }
-  nav { display:flex; gap:4px; flex-wrap:wrap; }
-  nav a { color:var(--accent-ink); text-decoration:none; font-size:14px; padding:16px 10px; opacity:.85; border-bottom:3px solid transparent; }
-  nav a:hover { opacity:1; background:rgba(255,255,255,.08); }
-  nav a.active { opacity:1; border-bottom-color:#fff; font-weight:600; }
+  header nav { display:flex; gap:4px; flex-wrap:wrap; }
+  header nav a { color:var(--accent-ink); text-decoration:none; font-size:14px; padding:16px 10px; opacity:.85; border-bottom:3px solid transparent; }
+  header nav a:hover { opacity:1; background:rgba(255,255,255,.08); }
+  header nav a.active { opacity:1; border-bottom-color:#fff; font-weight:600; }
   main { max-width:1100px; margin:24px auto; padding:0 16px; }
   .grid { display:grid; grid-template-columns: 2fr 1fr; gap:16px; }
   .cards { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:16px; }
@@ -61,7 +64,7 @@
   #full .bar button { background:none; border:none; color:#fff; font-size:20px; line-height:1; cursor:pointer; }
   #full .body { flex:1; overflow:auto; padding:14px 18px; white-space:pre-wrap; font-size:14px; line-height:1.5; }
   .ok { color:var(--ok); } .bad { color:var(--bad); }
-  input, select { font:inherit; font-size:14px; padding:7px 9px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); }
+  input, select, textarea { font:inherit; font-size:14px; padding:7px 9px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); }
   .form-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .form-row input { flex:1 1 170px; min-width:0; }
   .form-row .btn { margin-top:0; }
@@ -76,11 +79,29 @@
   .eye { position:absolute; right:4px; top:50%; transform:translateY(-50%); background:none; border:none; padding:4px;
          color:var(--muted); cursor:pointer; display:grid; }
   .eye svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-  #pw-dlg { width:460px; max-width:calc(100vw - 32px); padding:20px; border:none; border-radius:14px; background:var(--card);
-            color:var(--ink); box-shadow:0 12px 40px rgba(0,0,0,.3); }
-  #pw-dlg::backdrop { background:rgba(20,28,45,.45); }
-  #pw-dlg .err { font-size:13px; min-height:1em; }
-  #pw-dlg .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
+  .dlg { width:460px; max-width:calc(100vw - 32px); padding:20px; border:none; border-radius:14px; background:var(--card);
+         color:var(--ink); box-shadow:0 12px 40px rgba(0,0,0,.3); }
+  .dlg::backdrop { background:rgba(20,28,45,.45); }
+  .dlg .err { font-size:13px; min-height:1em; }
+  .dlg .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
+  .dlg label { display:block; font-size:13px; color:var(--muted); margin:10px 0 0; }
+  .dlg label .pw-field { margin-top:4px; }
+  h3 { font-size:14px; margin:16px 0 4px; }
+  .subnav { display:flex; gap:6px; flex-wrap:wrap; margin:-6px 0 16px; }
+  .subnav a { padding:6px 12px; border-radius:999px; background:var(--soft); text-decoration:none; font-size:13px; }
+  main .subnav a.active { background:var(--brand); color:#fff; }
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
+  .form-grid .full { grid-column:1 / -1; }
+  .f { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
+  .f input, .f select, .f textarea { width:100%; }
+  .f.check { flex-direction:row; align-items:center; gap:8px; font-size:13px; color:var(--ink); }
+  .f.check input { width:auto; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; }
+  .stat { background:var(--soft); border-radius:8px; padding:10px 12px; }
+  .stat b { display:block; font-size:17px; margin-top:2px; overflow-wrap:anywhere; }
+  .stat span { font-size:12px; color:var(--muted); }
+  td .note { margin-top:2px; }
+  .kb-doc + .kb-doc { margin-top:18px; }
   section[hidden] { display:none; }
   #fab { position:fixed; right:24px; bottom:24px; width:64px; height:64px; border-radius:50%; border:none;
          background:var(--brand); color:#fff; font-size:28px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.25); }
@@ -94,8 +115,9 @@
   #panel .bar button { background:none; border:none; color:#fff; font-size:20px; cursor:pointer; }
   #panel iframe { border:0; flex:1; width:100%; }
   @media (max-width: 700px) {
-    .grid { grid-template-columns:1fr; } nav a { padding:10px 8px; }
-    header { row-gap:0; } nav { order:3; flex-basis:100%; } #me-name { display:none; }
+    .grid { grid-template-columns:1fr; } header nav a { padding:10px 8px; }
+    header { row-gap:0; } header nav { order:3; flex-basis:100%; } #me-name { max-width:170px; }
+    .form-grid { grid-template-columns:1fr; }
     #panel { right:8px; left:8px; width:auto; bottom:96px; } #fab .hint { display:none; }
     #tab-docs th:nth-child(3), #tab-docs td:nth-child(3) { display:none; }
   }
@@ -109,10 +131,10 @@
     <a href="#docs" data-tab="docs">Документы</a>
     <a href="#services" data-tab="services">Сервисы</a>
     <a href="#dou" data-tab="dou">Раздел Департамента ДОУ</a>
-    <a href="#users" data-tab="users" id="nav-users" hidden>Пользователи</a>
+    <a href="#admin" data-tab="admin" id="nav-admin" hidden>Админ-панель</a>
   </nav>
   <div class="tools">
-  <span id="me-name"></span>
+  <button id="me-name" type="button" title="Мой профиль и смена пароля"></button>
   <button id="logout" type="button">Выйти</button>
   <button id="theme" type="button">
     <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
@@ -205,9 +227,18 @@
     </div>
   </section>
 
-  <!-- Пользователи (администратор) -->
-  <section id="tab-users" hidden>
-    <h1>Пользователи</h1>
+  <!-- Админ-панель (администратор) -->
+  <section id="tab-admin" hidden>
+    <h1>Админ-панель</h1>
+    <nav class="subnav" aria-label="Разделы админ-панели">
+      <a href="#admin/users" data-sub="users">Пользователи</a>
+      <a href="#admin/log" data-sub="log">Журнал действий</a>
+      <a href="#admin/questions" data-sub="questions">Вопросы без ответа и оценки</a>
+      <a href="#admin/news" data-sub="news">Новости</a>
+      <a href="#admin/kb" data-sub="kb">База знаний и статус</a>
+    </nav>
+
+    <div id="admin-users" class="sub">
     <div class="card">
       <h2>Новая учётная запись</h2>
       <form id="user-add" class="form-row">
@@ -232,10 +263,123 @@
       </div>
       <p class="note">Смена роли и блокировка действуют сразу. После смены пароля сотрудник выходит из всех сессий и входит с новым паролем.</p>
     </div>
+    </div>
+
+    <div id="admin-log" class="sub" hidden>
+      <div class="card">
+        <form id="log-filter" class="form-row">
+          <select name="user"><option value="">Все сотрудники</option></select>
+          <select name="kind">
+            <option value="">Все события</option><option value="question">Вопросы помощнику</option>
+            <option value="login">Входы и пароли</option><option value="admin">Действия администратора</option>
+          </select>
+          <input name="date_from" type="date" title="С даты">
+          <input name="date_to" type="date" title="По дату">
+          <input name="q" placeholder="Поиск по тексту вопроса">
+          <button class="btn" type="submit">Показать</button>
+        </form>
+        <p class="note" id="log-total"></p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Время</th><th>Сотрудник</th><th>Событие</th><th>Подробности</th></tr></thead>
+            <tbody id="log-body"><tr><td colspan="4" class="note">Загрузка…</td></tr></tbody>
+          </table>
+        </div>
+        <button class="btn ghost" id="log-more" hidden>Показать ещё</button>
+        <p class="note">Персональные данные в вопросах замаскированы ещё при записи в журнал (ФИО, телефоны, e-mail, номера документов).</p>
+      </div>
+    </div>
+
+    <div id="admin-questions" class="sub" hidden>
+      <div class="card">
+        <h2>Вопросы без ответа</h2>
+        <p class="note">Помощник не нашёл ответа в базе знаний (релевантность ниже порога). Частые вопросы — кандидаты на дополнение Инструкции или раздела «Частые вопросы».</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Вопрос</th><th>Сколько раз</th><th>Последний раз</th><th>Лучшая релевантность</th><th>Роли</th></tr></thead>
+            <tbody id="unanswered-body"><tr><td colspan="5" class="note">Загрузка…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Оценки ответов</h2>
+        <div class="stats" id="fb-stats"></div>
+        <div class="form-row" style="margin-top:12px">
+          <select id="fb-filter"><option value="">Все оценки</option><option value="down">Только 👎</option><option value="up">Только 👍</option></select>
+        </div>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Время</th><th>Сотрудник</th><th>Оценка</th><th>Вопрос</th></tr></thead>
+            <tbody id="fb-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="admin-news" class="sub" hidden>
+      <div class="card">
+        <h2 id="news-form-title">Новая новость</h2>
+        <form id="news-form" class="form-grid">
+          <label class="f">Дата публикации<input name="date" type="date" required></label>
+          <label class="f">Рубрика или автор<input name="unit" placeholder="Департамент ДОУ"></label>
+          <label class="f full">Заголовок<input name="title" required maxlength="200"></label>
+          <label class="f full">Текст<textarea name="text" rows="3" maxlength="3000"></textarea></label>
+          <label class="f">Вопрос помощнику (кнопка с ответом в карточке)<input name="ask" placeholder="Кто визирует распоряжение о создании рабочей группы?"></label>
+          <label class="f">Подпись кнопки-вопроса<input name="ask_label" placeholder="Спросить помощника"></label>
+          <label class="f">Ссылка на раздел портала<input name="link" placeholder="#docs, #services, /?chat"></label>
+          <label class="f">Подпись ссылки<input name="link_label" placeholder="Подробнее"></label>
+          <label class="f check full"><input name="open_chat" type="checkbox"> Кнопка «Открыть помощника»</label>
+          <div class="full form-row">
+            <button class="btn" type="submit" id="news-submit">Опубликовать</button>
+            <button class="btn ghost" type="button" id="news-cancel" hidden>Отменить правку</button>
+          </div>
+        </form>
+        <div id="news-msg" class="notice" hidden></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Новости портала</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Дата</th><th>Рубрика</th><th>Заголовок</th><th></th></tr></thead>
+            <tbody id="admin-news-body"><tr><td colspan="4" class="note">Загрузка…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Автоматические новости</h2>
+        <p class="note">Появляются сами при загрузке новой редакции документа (раздел «База знаний и статус»); править их не нужно.</p>
+        <ul id="auto-news"></ul>
+      </div>
+    </div>
+
+    <div id="admin-kb" class="sub" hidden>
+      <div class="card">
+        <h2>Статус системы</h2>
+        <div class="stats" id="status-stats"><div class="note">Загрузка…</div></div>
+        <button class="btn ghost" id="status-refresh">Обновить</button>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Загрузить новую редакцию</h2>
+        <form id="kb-upload" class="form-grid">
+          <label class="f full">Документ<select name="doc_id" id="kb-doc" required></select></label>
+          <label class="f">Номер редакции<input name="version" placeholder="1.1" required pattern="\d{1,3}(\.\d{1,3}){0,3}"></label>
+          <label class="f">Действует с<input name="effective_date" type="date" required></label>
+          <label class="f full">Файл<input name="file" type="file" id="kb-file" required></label>
+          <div class="full form-row"><button class="btn" type="submit">Загрузить и проиндексировать</button></div>
+        </form>
+        <p class="note">Прежняя редакция уйдёт в архив, помощник сразу начнёт отвечать по новой, в ленте появится новость с изменёнными пунктами.
+          Индексация на сервере занимает около минуты.</p>
+        <div id="kb-job" class="notice" hidden></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Документы и редакции</h2>
+        <div id="kb-docs" class="note">Загрузка…</div>
+      </div>
+    </div>
   </section>
 </main>
 
-<dialog id="pw-dlg" aria-label="Новый пароль">
+<dialog id="pw-dlg" class="dlg" aria-label="Новый пароль">
   <form id="pw-form">
     <h2>Новый пароль для <span class="who"></span></h2>
     <div class="form-row">
@@ -245,6 +389,20 @@
     <p class="note">Не короче 8 символов. Сотрудник выйдет из всех сессий и войдёт с новым паролем.</p>
     <div class="bad err"></div>
     <div class="actions"><button type="button" class="btn ghost" id="pw-cancel">Отмена</button><button type="submit" class="btn">Сохранить</button></div>
+  </form>
+</dialog>
+
+<dialog id="me-dlg" class="dlg" aria-label="Мой профиль">
+  <form id="me-form">
+    <h2>Мой профиль</h2>
+    <p class="note" id="me-info"></p>
+    <h3>Сменить пароль</h3>
+    <label>Текущий пароль<span class="pw-field"><input name="current" type="password" autocomplete="current-password" required><button type="button" class="eye" data-eye aria-label="Показать пароль"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
+    <label>Новый пароль<span class="pw-field"><input name="new" type="password" autocomplete="new-password" required><button type="button" class="eye" data-eye aria-label="Показать пароль"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
+    <label>Новый пароль ещё раз<span class="pw-field"><input name="repeat" type="password" autocomplete="new-password" required><button type="button" class="eye" data-eye aria-label="Показать пароль"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
+    <p class="note">Не короче 8 символов. На других устройствах после смены пароля нужно будет войти заново.</p>
+    <div class="bad err"></div>
+    <div class="actions"><button type="button" class="btn ghost" id="me-cancel">Закрыть</button><button type="submit" class="btn">Сменить пароль</button></div>
   </form>
 </dialog>
 
@@ -291,18 +449,19 @@
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const fmtDate = iso => { const [y, m, d] = String(iso).split('-'); return d ? `${d}.${m}.${y}` : iso; };
 
-  // --- вкладки (адрес #news/#docs/#services/#dou, работает кнопка «назад»)
+  // --- вкладки (адрес #news/#docs/#services/#dou/#admin/<раздел>, работает кнопка «назад»)
   const loaded = {};
   function show() {
-    const tab = (location.hash || '#dou').slice(1);
+    if (location.hash === '#users') { location.replace('#admin/users'); return; }   // старый адрес вкладки
+    const [tab, sub] = (location.hash || '#dou').slice(1).split('/');
     const name = document.getElementById('tab-' + tab) ? tab : 'dou';
     document.querySelectorAll('main > section').forEach(s => s.hidden = s.id !== 'tab-' + name);
-    document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === name));
+    document.querySelectorAll('header nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === name));
     if (name === 'news') loadNews();
     if (name === 'docs' && !loaded.docs) { loaded.docs = true; loadDocs(); }
     if (name === 'services') loadHealth();
     if (name === 'dou' && !loaded.dou) { loaded.dou = true; loadDouList(); }
-    if (name === 'users') loadUsers();
+    if (name === 'admin') showAdmin(sub);
   }
   window.addEventListener('hashchange', show);
 
@@ -312,7 +471,7 @@
     const r = await fetch(url, body === undefined ? {method} : {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
     if (r.status === 401) { toLogin(); throw new Error('нужен вход'); }
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.detail || r.status);
+    if (!r.ok) throw new Error(Array.isArray(d.detail) ? d.detail.map(x => x.msg).join('; ') : d.detail || r.status);
     return d;
   }
   const getJSON = url => api('GET', url);
@@ -321,9 +480,9 @@
   async function loadMe() {
     me = await getJSON('/api/me');
     const el = document.getElementById('me-name');
-    el.textContent = me.name.includes(me.role_title) ? me.name : `${me.name} · ${me.role_title}`;
-    el.title = `${me.login} · ${me.role_title}`;
-    document.getElementById('nav-users').hidden = !me.can_manage_users;
+    el.textContent = (me.name.includes(me.role_title) ? me.name : `${me.name} · ${me.role_title}`) + ' ▾';
+    el.title = `${me.login} · ${me.role_title} — профиль и смена пароля`;
+    document.getElementById('nav-admin').hidden = !me.can_manage_users;
   }
   document.getElementById('logout').onclick = async () => {
     try { await fetch('/logout', {method: 'POST'}); } finally { location.replace('/login'); }
@@ -492,6 +651,250 @@
     } catch (e) { el.innerHTML = '<span class="bad">Сервер недоступен</span>'; }
   }
   document.getElementById('health-refresh').onclick = loadHealth;
+
+  // --- админ-панель: подразделы #admin/users|log|questions|news|kb
+  const fmtTs = ts => ts ? `${fmtDate(ts.slice(0, 10))} ${ts.slice(11, 16)}` : '';
+  const fmtSize = b => b == null ? '—' : b < 1024 ? `${b} Б` : b < 1048576 ? `${(b / 1024).toFixed(1)} КБ` : `${(b / 1048576).toFixed(1)} МБ`;
+  const fmtGb = b => b == null ? '—' : `${(b / 1073741824).toFixed(1)} ГБ`;
+  const fmtUptime = s => { const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+                           return d ? `${d} д ${h} ч` : h ? `${h} ч ${m} мин` : `${m} мин`; };
+  const ADMIN_LOADERS = {users: loadUsers, log: () => loadLog(), questions: loadQuestions, news: loadAdminNews, kb: loadKb};
+  function showAdmin(sub) {
+    const name = ADMIN_LOADERS[sub] ? sub : 'users';
+    document.querySelectorAll('#tab-admin .sub').forEach(d => d.hidden = d.id !== 'admin-' + name);
+    document.querySelectorAll('.subnav a').forEach(a => a.classList.toggle('active', a.dataset.sub === name));
+    ADMIN_LOADERS[name]();
+  }
+
+  // журнал действий
+  const EVENTS = {login: 'Вход', login_failed: 'Неудачный вход', password_changed: 'Сменил свой пароль',
+    'admin:add': 'Создал учётную запись', 'admin:role': 'Сменил роль', 'admin:block': 'Заблокировал',
+    'admin:unblock': 'Разблокировал', 'admin:update': 'Изменил учётную запись', 'admin:password': 'Сменил пароль сотруднику',
+    'admin:remove': 'Удалил учётную запись', 'admin:news_add': 'Добавил новость', 'admin:news_update': 'Изменил новость',
+    'admin:news_remove': 'Удалил новость', 'admin:kb_upload': 'Загрузил редакцию', 'admin:kb_activate': 'Вернул редакцию'};
+  let logOffset = 0;
+  async function loadLog(more) {
+    const body = document.getElementById('log-body'), f = document.getElementById('log-filter');
+    logOffset = more ? logOffset + 100 : 0;
+    const qs = new URLSearchParams([...new FormData(f)].filter(([, v]) => v));
+    qs.set('offset', logOffset);
+    try {
+      const d = await getJSON('/api/admin/audit?' + qs);
+      const sel = f.user, cur = sel.value;
+      sel.innerHTML = '<option value="">Все сотрудники</option>' + d.users.map(u => `<option${u === cur ? ' selected' : ''}>${esc(u)}</option>`).join('');
+      const rows = d.items.map(r => {
+        if ('intent' in r) {
+          const meta = [r.intent, r.sources && r.sources.length ? 'источники: ' + r.sources.join(', ') : '', r.latency_ms != null ? `${(r.latency_ms / 1000).toFixed(1)} с` : ''].filter(Boolean).join(' · ');
+          return `<tr><td style="white-space:nowrap">${fmtTs(r.ts)}</td><td>${esc(r.user || '')}</td>
+            <td>Вопрос${r.refused ? '<span class="tag">отказ</span>' : ''}</td><td>${esc(r.query || '')}<div class="note">${esc(meta)}</div></td></tr>`;
+        }
+        const label = EVENTS[r.event] || r.event, bad = r.event === 'login_failed';
+        return `<tr><td style="white-space:nowrap">${fmtTs(r.ts)}</td><td>${esc(r.user || '')}</td>
+          <td${bad ? ' class="bad"' : ''}>${esc(label)}</td><td>${esc(r.target || '')}</td></tr>`;
+      }).join('');
+      if (more) body.insertAdjacentHTML('beforeend', rows);
+      else body.innerHTML = rows || '<tr><td colspan="4" class="note">Записей нет</td></tr>';
+      document.getElementById('log-total').textContent = `Найдено записей: ${d.total}`;
+      document.getElementById('log-more').hidden = logOffset + d.items.length >= d.total;
+    } catch (e) { body.innerHTML = `<tr><td colspan="4" class="bad">Не удалось загрузить журнал (${esc(e.message)})</td></tr>`; }
+  }
+  document.getElementById('log-filter').onsubmit = e => { e.preventDefault(); loadLog(); };
+  document.getElementById('log-more').onclick = () => loadLog(true);
+
+  // вопросы без ответа и оценки
+  let fbItems = [];
+  async function loadQuestions() {
+    const ub = document.getElementById('unanswered-body');
+    try {
+      const d = await getJSON('/api/admin/feedback');
+      ub.innerHTML = d.unanswered.map(g => `<tr><td>${esc(g.query)}</td><td>${g.count}</td><td style="white-space:nowrap">${fmtTs(g.last)}</td>
+        <td>${Math.round(g.best * 100)} %</td><td>${esc(g.roles.join(', '))}</td></tr>`).join('')
+        || '<tr><td colspan="5" class="note">Таких вопросов пока нет</td></tr>';
+      const {up, down} = d.feedback, all = up + down;
+      document.getElementById('fb-stats').innerHTML = `<div class="stat"><span>Оценок</span><b>${all}</b></div>
+        <div class="stat"><span>👍 Полезно</span><b>${up}</b></div><div class="stat"><span>👎 Не помогло</span><b>${down}</b></div>
+        <div class="stat"><span>Доля положительных</span><b>${all ? Math.round(up / all * 100) + ' %' : '—'}</b></div>`;
+      fbItems = d.feedback.items;
+      renderFeedback();
+    } catch (e) { ub.innerHTML = `<tr><td colspan="5" class="bad">Не удалось загрузить (${esc(e.message)})</td></tr>`; }
+  }
+  function renderFeedback() {
+    const v = document.getElementById('fb-filter').value, items = fbItems.filter(i => !v || i.value === v);
+    document.getElementById('fb-body').innerHTML = items.map(i => `<tr><td style="white-space:nowrap">${fmtTs(i.ts)}</td>
+      <td>${esc(i.user || '')}</td><td>${i.value === 'up' ? '👍' : '👎'}</td><td>${esc(i.query || '')}</td></tr>`).join('')
+      || '<tr><td colspan="4" class="note">Оценок пока нет</td></tr>';
+  }
+  document.getElementById('fb-filter').onchange = renderFeedback;
+
+  // новости
+  const newsForm = document.getElementById('news-form');
+  let newsItems = [], editingNews = null;
+  const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  function resetNewsForm() {
+    editingNews = null;
+    newsForm.reset();
+    newsForm.date.value = today();
+    document.getElementById('news-form-title').textContent = 'Новая новость';
+    document.getElementById('news-submit').textContent = 'Опубликовать';
+    document.getElementById('news-cancel').hidden = true;
+  }
+  async function loadAdminNews() {
+    const body = document.getElementById('admin-news-body');
+    if (!editingNews && !newsForm.date.value) newsForm.date.value = today();
+    try {
+      const d = await getJSON('/api/admin/news');
+      newsItems = d.items;
+      body.innerHTML = [...newsItems].sort((a, b) => String(b.date).localeCompare(String(a.date))).map(n => `<tr data-id="${esc(n.id)}">
+        <td style="white-space:nowrap">${fmtDate(n.date)}</td><td>${esc(n.unit || '')}</td><td>${esc(n.title)}</td>
+        <td style="white-space:nowrap"><button class="link" data-news="edit">Изменить</button><button class="link danger" data-news="remove">Удалить</button></td></tr>`).join('')
+        || '<tr><td colspan="4" class="note">Новостей нет</td></tr>';
+      document.getElementById('auto-news').innerHTML = d.auto.map(n => `<li>${fmtDate(n.date)} — ${esc(n.title)}</li>`).join('')
+        || '<li>Пока нет: новые редакции не загружались</li>';
+    } catch (e) { body.innerHTML = `<tr><td colspan="4" class="bad">Не удалось загрузить новости (${esc(e.message)})</td></tr>`; }
+  }
+  const newsMsg = (html, bad) => { const m = document.getElementById('news-msg'); m.hidden = false; m.className = 'notice' + (bad ? ' bad' : ''); m.innerHTML = html; };
+  newsForm.onsubmit = async e => {
+    e.preventDefault();
+    const f = new FormData(newsForm), data = Object.fromEntries([...f].filter(([k]) => k !== 'open_chat'));
+    data.open_chat = newsForm.open_chat.checked;
+    try {
+      if (editingNews) await api('PUT', '/api/admin/news/' + encodeURIComponent(editingNews), data);
+      else await api('POST', '/api/admin/news', data);
+      newsMsg(editingNews ? 'Новость сохранена.' : 'Новость опубликована — она уже на вкладке «Новости».');
+      resetNewsForm();
+      loadAdminNews();
+    } catch (err) { newsMsg(esc(err.message), true); }
+  };
+  document.getElementById('news-cancel').onclick = resetNewsForm;
+  document.getElementById('admin-news-body').addEventListener('click', async e => {
+    const b = e.target.closest('button[data-news]');
+    if (!b) return;
+    const id = b.closest('tr').dataset.id, n = newsItems.find(x => x.id === id);
+    if (b.dataset.news === 'edit' && n) {
+      editingNews = id;
+      for (const k of ['date', 'unit', 'title', 'text', 'ask', 'ask_label', 'link', 'link_label']) newsForm[k].value = n[k] || '';
+      newsForm.open_chat.checked = !!n.open_chat;
+      document.getElementById('news-form-title').textContent = 'Правка новости';
+      document.getElementById('news-submit').textContent = 'Сохранить';
+      document.getElementById('news-cancel').hidden = false;
+      newsForm.scrollIntoView({behavior: 'smooth', block: 'start'});
+    } else if (b.dataset.news === 'remove' && n && confirm(`Удалить новость «${n.title}»?`)) {
+      try { await api('DELETE', '/api/admin/news/' + encodeURIComponent(id)); newsMsg('Новость удалена.'); loadAdminNews(); }
+      catch (err) { newsMsg(esc(err.message), true); }
+    }
+  });
+
+  // база знаний и статус
+  let kbDocs = [], jobTimer = null;
+  async function loadStatus() {
+    const el = document.getElementById('status-stats');
+    try {
+      const s = await getJSON('/api/admin/status'), ok = v => v ? '<span class="ok">работает</span>' : '<span class="bad">недоступна</span>';
+      const mem = s.memory ? `${fmtGb(s.memory.total - s.memory.available)} из ${fmtGb(s.memory.total)}` : '—';
+      const stat = (label, value) => `<div class="stat"><span>${label}</span><b>${value}</b></div>`;
+      el.innerHTML = [
+        stat('Сервер работает', fmtUptime(s.uptime_s) + `<div class="note">с ${fmtTs(s.started_at)}</div>`),
+        stat('Языковая модель', ok(s.ollama.ok && s.ollama.llm) + `<div class="note">${esc(s.models.llm)}</div>`),
+        stat('Модель эмбеддингов', ok(s.ollama.ok && s.ollama.embed) + `<div class="note">${esc(s.models.embed)}</div>`),
+        stat('Фрагментов в индексе', s.index_chunks ?? '—'),
+        stat('Учётных записей', s.users),
+        stat('За сутки: вопросов', `${s.day.questions}<div class="note">отказов: ${s.day.refused}, сотрудников: ${s.day.people}</div>`),
+        stat('За сутки: входов', `${s.day.logins}<div class="note">неудачных: ${s.day.failed_logins}</div>`),
+        s.load ? stat('Нагрузка', `${s.load[0].toFixed(2)}<div class="note">ядер: ${s.cpus}</div>`) : '',
+        s.memory ? stat('Память занята', mem) : '',
+        stat('Свободно на диске', `${fmtGb(s.disk.free)}<div class="note">из ${fmtGb(s.disk.total)}</div>`),
+        stat('Журналы', `${fmtSize(s.logs.audit_log)}<div class="note">без ответа: ${fmtSize(s.logs.unanswered_log)}, оценки: ${fmtSize(s.logs.feedback_log)}</div>`),
+      ].join('');
+    } catch (e) { el.innerHTML = `<div class="bad">Не удалось получить статус (${esc(e.message)})</div>`; }
+  }
+  document.getElementById('status-refresh').onclick = loadStatus;
+  async function loadKb() {
+    loadStatus();
+    const box = document.getElementById('kb-docs');
+    try {
+      const d = await getJSON('/api/admin/kb');
+      kbDocs = d.documents;
+      const sel = document.getElementById('kb-doc'), cur = sel.value;
+      sel.innerHTML = kbDocs.map(x => `<option value="${esc(x.doc_id)}"${x.doc_id === cur ? ' selected' : ''}>${esc(x.title)} (${esc(x.ext)})</option>`).join('');
+      updateKbAccept();
+      const diff = v => v.diff ? `изм. ${v.diff.changed}, доб. ${v.diff.added}, искл. ${v.diff.removed}` : '—';
+      box.innerHTML = kbDocs.map(x => `<div class="kb-doc"><b>${esc(x.title)}</b><div class="scroll"><table>
+        <thead><tr><th>Редакция</th><th>Действует с</th><th>Статус</th><th>Пунктов</th><th>Загружена</th><th>Изменения</th><th></th></tr></thead><tbody>
+        ${x.versions.map(v => `<tr><td>${esc(v.version)}</td><td>${fmtDate(v.effective_date)}</td>
+          <td>${v.status === 'active' ? '<span class="ok">действует</span>' : 'архив'}</td><td>${v.sections}</td>
+          <td style="white-space:nowrap">${fmtTs(v.ingested_at)}<div class="note">${esc(v.file)}</div></td><td>${diff(v)}</td>
+          <td>${v.status === 'active' ? '' : `<button class="link" style="white-space:normal" data-activate="${esc(x.doc_id)}" data-version="${esc(v.version)}">Сделать действующей</button>`}</td></tr>`).join('')}
+        </tbody></table></div></div>`).join('') || 'Документов нет';
+      showJob(d.job);
+    } catch (e) { box.innerHTML = `<span class="bad">Не удалось загрузить (${esc(e.message)})</span>`; }
+  }
+  function updateKbAccept() {
+    const x = kbDocs.find(d => d.doc_id === document.getElementById('kb-doc').value);
+    document.getElementById('kb-file').accept = x ? x.ext : '';
+  }
+  document.getElementById('kb-doc').onchange = updateKbAccept;
+  function showJob(job) {
+    const el = document.getElementById('kb-job');
+    clearTimeout(jobTimer);
+    if (!job) { el.hidden = true; return; }
+    el.hidden = false;
+    el.className = 'notice' + (job.status === 'error' ? ' bad' : '');
+    if (job.status === 'running') {
+      el.innerHTML = `⏳ Индексация: <b>${esc(job.title)}</b> (с ${fmtTs(job.started_at)})…`;
+      jobTimer = setTimeout(async () => { try { const j = await getJSON('/api/admin/kb/job'); if (j && j.status !== 'running') loadKb(); else showJob(j); } catch (e) { showJob(job); } }, 2000);
+    } else if (job.status === 'error') {
+      el.innerHTML = `Не удалось загрузить «${esc(job.title)}»: ${esc(job.error)}`;
+    } else {
+      const r = job.result || {};
+      el.innerHTML = r.skipped ? `«${esc(job.title)}»: ${esc(r.reason)}.`
+        : `✅ ${esc(job.title)} — загружено: пунктов ${r.sections}, фрагментов ${r.chunks}` +
+          (r.archived_versions && r.archived_versions.length ? `; в архив: ред. ${esc(r.archived_versions.join(', '))}` : '') +
+          (r.diff ? `; изменено пунктов ${r.diff.changed.length}, добавлено ${r.diff.added.length}, исключено ${r.diff.removed.length}` : '') + '.';
+    }
+  }
+  document.getElementById('kb-upload').onsubmit = async e => {
+    e.preventDefault();
+    const el = document.getElementById('kb-job');
+    try {
+      const r = await fetch('/api/admin/kb/upload', {method: 'POST', body: new FormData(e.target)});
+      if (r.status === 401) { toLogin(); return; }
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(Array.isArray(d.detail) ? d.detail.map(x => x.msg).join('; ') : d.detail || r.status);
+      e.target.file.value = '';
+      showJob(d);
+    } catch (err) { el.hidden = false; el.className = 'notice bad'; el.textContent = err.message; }
+  };
+  document.getElementById('kb-docs').addEventListener('click', async e => {
+    const b = e.target.closest('button[data-activate]');
+    if (!b || !confirm(`Сделать действующей ред. ${b.dataset.version}? Текущая уйдёт в архив.`)) return;
+    try { showJob(await api('POST', '/api/admin/kb/activate', {doc_id: b.dataset.activate, version: b.dataset.version})); }
+    catch (err) { const el = document.getElementById('kb-job'); el.hidden = false; el.className = 'notice bad'; el.textContent = err.message; }
+  });
+
+  // --- мой профиль: смена своего пароля
+  const meDlg = document.getElementById('me-dlg'), meForm = document.getElementById('me-form');
+  document.getElementById('me-name').onclick = () => {
+    if (!me) return;
+    meForm.reset();
+    meForm.querySelectorAll('input').forEach(i => i.type = 'password');
+    meDlg.querySelector('.err').textContent = '';
+    document.getElementById('me-info').innerHTML = `${esc(me.name)} · логин <b>${esc(me.login)}</b> · ${esc(me.role_title)}`;
+    meDlg.showModal();
+    meForm.current.focus();
+  };
+  document.getElementById('me-cancel').onclick = () => meDlg.close();
+  meForm.addEventListener('input', () => { meDlg.querySelector('.err').textContent = ''; });
+  meForm.onsubmit = async e => {
+    e.preventDefault();
+    const err = meDlg.querySelector('.err');
+    if (meForm.new.value !== meForm.repeat.value) { err.textContent = 'Новый пароль и повтор не совпадают'; return; }
+    try {
+      await api('POST', '/api/me/password', {current: meForm.current.value, new: meForm.new.value});
+      meDlg.close();
+      if (frame.src) frame.src = '/?chat';   // чат в окне переподключится с новым токеном входа
+      alert('Пароль изменён. На других устройствах нужно будет войти заново.');
+    } catch (ex) { err.textContent = ex.message; }
+  };
 
   // --- быстрые ответы помощника через REST API: в карточке первые 5 строк, весь ответ — в окне «Подробнее»
   const plain = md => md.replace(/\*\*/g, '').replace(/^> ?/gm, '').replace(/_⏱.*$/m, '')

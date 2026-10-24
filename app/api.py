@@ -9,10 +9,8 @@ from __future__ import annotations
 import gzip
 import re
 
-from urllib.parse import quote
-
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 
 from app.config import ROOT
@@ -20,7 +18,7 @@ from app.dialog.engine import Session, get_engine
 from app.ingest.indexer import load_registry
 from app.llm.client import get_client
 from app.security import audit, users
-from app.security.access import roles
+from app.security.session import account, account_from_request, issue_cookie, login_redirect
 
 router = APIRouter()
 _sessions: dict[str, Session] = {}
@@ -32,57 +30,11 @@ class AskIn(BaseModel):
     session_id: str | None = None
 
 
-class UserIn(BaseModel):
-    login: str
-    name: str
-    role: str
-    password: str | None = None     # пусто — сгенерируется
+class OwnPasswordIn(BaseModel):
+    current: str
+    new: str
 
 
-class PasswordIn(BaseModel):
-    password: str | None = None     # пусто — сгенерируется
-
-
-class UserPatch(BaseModel):
-    name: str | None = None
-    role: str | None = None
-    disabled: bool | None = None
-
-
-def _account(request: Request) -> dict | None:
-    """Учётная запись по токену входа Chainlit (cookie или заголовок Authorization: Bearer)."""
-    from chainlit.auth import get_token_from_cookies
-    from chainlit.auth.jwt import decode_jwt
-
-    token = get_token_from_cookies(dict(request.cookies))
-    header = request.headers.get("authorization", "")
-    if not token and header.lower().startswith("bearer "):
-        token = header[7:]
-    if not token:
-        return None
-    try:
-        user = decode_jwt(token)
-    except Exception:
-        return None
-    return users.session_account(user.identifier, (user.metadata or {}).get("pwv"))
-
-
-def account(request: Request) -> dict:
-    acc = _account(request)
-    if acc is None:
-        raise HTTPException(401, "Требуется вход")
-    return acc
-
-
-def admin(acc: dict = Depends(account)) -> dict:
-    if not users.can_manage(acc["role"]):
-        raise HTTPException(403, "Доступно только администратору")
-    return acc
-
-
-def _login_redirect(request: Request) -> RedirectResponse:
-    target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
-    return RedirectResponse(f"/login?next={quote(target, safe='')}", status_code=303)
 
 
 @router.get("/api/health")
@@ -188,52 +140,19 @@ def me(acc: dict = Depends(account)):
     return {k: acc[k] for k in ("login", "name", "role", "role_title", "can_manage_users")}
 
 
-# ---------------------------------------------------------------- учётные записи (администратор)
-
-def _user_op(fn, *args, **kwargs):
+@router.post("/api/me/password")
+def my_password(body: OwnPasswordIn, request: Request, acc: dict = Depends(account)):
+    """Смена своего пароля. Другие сессии сотрудника завершаются, текущая получает новый токен."""
+    if users.authenticate(acc["login"], body.current) is None:
+        raise HTTPException(400, "Текущий пароль неверный (после нескольких ошибок подряд проверка на время закрывается)")
     try:
-        return fn(*args, **kwargs)
+        users.set_password(acc["login"], body.new)
     except users.UserError as e:
         raise HTTPException(400, str(e)) from e
-
-
-@router.get("/api/admin/users")
-def admin_users(_: dict = Depends(admin)):
-    return {"users": users.list_users(), "roles": [{"id": k, "title": r["title"]} for k, r in roles().items()]}
-
-
-@router.post("/api/admin/users")
-def admin_add(body: UserIn, acc: dict = Depends(admin)):
-    password = _user_op(users.add, body.login, body.name, body.role, body.password or None)
-    audit.log_admin(acc["login"], "add", body.login)
-    return {"login": users.norm_login(body.login), "password": password}
-
-
-@router.patch("/api/admin/users/{login}")
-def admin_update(login: str, body: UserPatch, acc: dict = Depends(admin)):
-    login = users.norm_login(login)
-    if login == acc["login"] and (body.disabled or (body.role is not None and not users.can_manage(body.role))):
-        raise HTTPException(400, "Нельзя заблокировать себя или снять с себя права администратора")
-    user = _user_op(users.update, login, name=body.name, role=body.role, disabled=body.disabled)
-    audit.log_admin(acc["login"], "update", login)
-    return {"user": user}
-
-
-@router.post("/api/admin/users/{login}/password")
-def admin_password(login: str, body: PasswordIn | None = None, acc: dict = Depends(admin)):
-    password = _user_op(users.set_password, login, (body.password if body else None) or None)
-    audit.log_admin(acc["login"], "password", login)
-    return {"password": password}
-
-
-@router.delete("/api/admin/users/{login}")
-def admin_remove(login: str, acc: dict = Depends(admin)):
-    login = users.norm_login(login)
-    if login == acc["login"]:
-        raise HTTPException(400, "Нельзя удалить свою учётную запись")
-    _user_op(users.remove, login)
-    audit.log_admin(acc["login"], "remove", login)
-    return {"ok": True}
+    audit.log_event("password_changed", acc["login"])
+    response = JSONResponse({"ok": True})
+    issue_cookie(request, response, users.get(acc["login"]))
+    return response
 
 
 # ---------------------------------------------------------------- страницы
@@ -242,15 +161,15 @@ def admin_remove(login: str, acc: dict = Depends(admin)):
 def login_page(request: Request):
     """Страница входа портала; форма отправляет логин и пароль в POST /login Chainlit."""
     nxt = request.query_params.get("next", "/")
-    if _account(request) is not None:
+    if account_from_request(request) is not None:
         return RedirectResponse(nxt if _LOCAL.fullmatch(nxt) else "/", status_code=303)
     return HTMLResponse((ROOT / "public" / "login.html").read_text(encoding="utf-8"))
 
 
 @router.get("/widget", response_class=HTMLResponse)
 def widget(request: Request):
-    if _account(request) is None:
-        return _login_redirect(request)
+    if account_from_request(request) is None:
+        return login_redirect(request)
     return HTMLResponse((ROOT / "public" / "portal_widget.html").read_text(encoding="utf-8"))
 
 
@@ -258,8 +177,8 @@ def widget(request: Request):
 async def index(request: Request):
     """Корень открывает портал; сам чат Chainlit — по адресу /?chat (так его грузит виджет)."""
     if "chat" in request.query_params:
-        if _account(request) is None:
-            return _login_redirect(request)
+        if account_from_request(request) is None:
+            return login_redirect(request)
         from chainlit.server import serve
 
         return await serve(request)
@@ -288,9 +207,12 @@ def install_routes() -> None:
 
     if any(getattr(r, "path", "") == "/api/health" for r in app.router.routes):
         return
+    from app.admin_api import router as admin_router
+
     app.middleware("http")(_strip_external)
     before = len(app.router.routes)
     app.include_router(router)
+    app.include_router(admin_router)
     new = app.router.routes[before:]
     del app.router.routes[before:]
     app.router.routes[0:0] = new

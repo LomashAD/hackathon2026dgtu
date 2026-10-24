@@ -121,7 +121,7 @@ questions:
   - id: p03
     q: Можно ли обрабатывать информацию ограниченного доступа в ИИС ДО без шифрования?
     type: answer
-    role: expert
+    role: admin
     expected: [instr_dou:2.11]
   # --- контрольная (holdout) выборка: добавлена после настройки порогов, на ней ничего не подбиралось
   - {id: h01, holdout: true, q: "Кто подписывает постановление Организации?", type: answer, expected: [instr_dou:9.2]}
@@ -133,6 +133,6 @@ questions:
   - {id: h07, holdout: true, q: "Можно ли исправить акт после подписания?", type: answer, expected: [instr_dou:9.14]}
   - {id: h08, holdout: true, q: "Что должно быть в протоколе заседания комиссии?", type: answer, expected: [instr_dou:9.13]}
   - {id: h09, holdout: true, q: "Нужно ли регистрировать рекламные буклеты?", type: answer, expected: [instr_dou:5.5]}
-  - {id: h10, holdout: true, q: "Можно ли уничтожать документы, если идет судебный спор?", type: answer, role: expert, expected: [instr_dou:11.13]}
+  - {id: h10, holdout: true, q: "Можно ли уничтожать документы, если идет судебный спор?", type: answer, role: admin, expected: [instr_dou:11.13]}
   - {id: h11, holdout: true, q: "Как подать заявку на отпуск через кадровый портал?", type: no_answer}
   - {id: h12, holdout: true, q: "Сколько стоит парковка у офиса?", type: no_answer}

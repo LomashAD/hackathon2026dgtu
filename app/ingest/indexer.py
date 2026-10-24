@@ -163,9 +163,17 @@ def ingest(source: dict, file: Path | None = None, version: str | None = None,
 
 
 def ingest_all(force: bool = False) -> list[dict]:
-    """Загрузить все источники из config.yaml (если ещё не загружены)."""
+    """Загрузить источники из config.yaml, у которых ещё нет действующей редакции. Документ с действующей
+    редакцией пропускается: иначе при запуске (run.sh) редакция из config.yaml снова стала бы действующей
+    поверх загруженной позже (scripts/ingest.py --version или админ-панель)."""
     out = []
+    reg = load_registry()
     for src in get_config()["sources"]:
+        act = None if force else active_version(src["doc_id"], reg)
+        if act:
+            out.append({"doc_id": src["doc_id"], "version": act["version"], "skipped": True,
+                        "reason": f"уже загружен, действует ред. {act['version']}"})
+            continue
         out.append(ingest(src, force=force))
     return out
 

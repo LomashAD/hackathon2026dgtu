@@ -174,7 +174,7 @@ def test_pii_mask():
 def test_access_where():
     from app.security.access import allowed_levels, build_where
     assert "confidential" not in allowed_levels("employee")
-    assert "confidential" in allowed_levels("expert")
+    assert "confidential" in allowed_levels("admin")
     w = build_where(["public", "internal"])
     assert {"status": "active"} in w["$and"] and {"access_level": {"$in": ["public", "internal"]}} in w["$and"]
 
@@ -269,9 +269,9 @@ def test_access_filter_end_to_end():
     from app.dialog.engine import Session, get_engine
     q = "Можно ли обрабатывать информацию ограниченного доступа в ИИС ДО без шифрования?"
     emp = get_engine().handle(Session(role="employee"), q)
-    exp = get_engine().handle(Session(role="expert"), q)
+    adm = get_engine().handle(Session(role="admin"), q)
     assert all(s.section != "2.11" for s in emp.sources) and "2.11" not in emp.text
-    assert any(s.section == "2.11" for s in exp.sources)
+    assert any(s.section == "2.11" for s in adm.sources)
 
 
 @pytest.mark.skipif(not _ollama_up(), reason="Ollama недоступна")
