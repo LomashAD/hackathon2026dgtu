@@ -4,121 +4,168 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Внутренний портал — макет виджета</title>
+<link rel="icon" href="/public/favicon.svg">
+<link rel="stylesheet" href="/public/fonts/inter.css">
 <script>
-  // Тема до первой отрисовки, чтобы не мигала: выбор кнопкой ☀/☾ или, если его нет, тема системы
+  // Тема до первой отрисовки, чтобы не мигала: выбор кнопкой ☀/☾, иначе тёмная (DESIGN.md «Graphite»: Theme: dark)
   (() => { let t = null; try { t = localStorage.getItem('vite-ui-theme'); } catch (e) {}
-    document.documentElement.dataset.theme = t === 'light' || t === 'dark' ? t
-      : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; })();
+    document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark'; })();
 </script>
 <style>
-  :root { --bg:#f4f6f9; --card:#fff; --ink:#1d2433; --muted:#5b6475; --accent:#1f5fae; --brand:#1f5fae; --accent-ink:#fff;
-          --line:#dde3ec; --soft:#eaf1fb; --ok:#1b7f3b; --bad:#b3261e; color-scheme:light; }
-  :root[data-theme="dark"] { --bg:#11151c; --card:#1a2029; --ink:#e6e9ef; --muted:#a3acbb; --accent:#7fb0f0; --brand:#2a64ad;
-          --line:#2c3542; --soft:#1f2b3c; --ok:#5cc27f; --bad:#f2857d; color-scheme:dark; }
+  /* Оформление по DESIGN.md «Graphite»: Obsidian Canvas, рамки Graphite Edge, Inter вместо matterFont, радиусы 8/10 px.
+     Светлая тема в DESIGN.md не описана — та же палитра в обратном порядке (docs/frontend_notes.md). */
+  :root { --bg:#0a0a0a; --card:#0a0a0a; --surface:#171717; --ink:#fafafa; --muted:#a1a1a1; --ash:#737373;
+          --accent:#ff8833; --brand:#e5e5e5; --brand-ink:#171717; --line:#262626; --steel:#464646; --soft:#171717;
+          --hair:rgba(255,255,255,.1); --ok:#5cc27f; --bad:#f2857d; color-scheme:dark;
+          --font:'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          --shadow-sm:rgba(0,0,0,.25) 0px 4px 4px 0px; --shadow-md:rgba(0,0,0,.3) 0px 8px 10px 0px;
+          --shadow-subtle:rgba(101,129,128,.15) 0px 0px 2px 2px inset, rgba(32,47,46,.15) 0px 0px 4px 4px inset;
+          --shadow-subtle-2:rgba(0,0,0,.1) 0px 1px 3px 0px, rgba(0,0,0,.1) 0px 1px 2px -1px;
+          --shadow-subtle-3:rgb(255,255,255) 0px 1px 0px 0px inset, rgba(0,0,0,.1) 0px -2px 6px 0px inset;
+          --ghost:#262626; }
+  :root[data-theme="light"] { --bg:#fafafa; --card:#ffffff; --surface:#ffffff; --ink:#0a0a0a; --muted:#666666; --ash:#737373;
+          --accent:#b84d00; --brand:#171717; --brand-ink:#fafafa; --line:#e5e5e5; --steel:#a1a1a1; --soft:#f0f0f0;
+          --hair:rgba(0,0,0,.1); --ok:#1b7f3b; --bad:#b3261e; color-scheme:light;
+          --shadow-subtle-3:rgba(255,255,255,.12) 0px 1px 0px 0px inset, rgba(0,0,0,.1) 0px -2px 6px 0px inset;
+          --ghost:#ffffff; }
   * { box-sizing: border-box; }
   [hidden] { display:none !important; }   /* иначе .btn { display:inline-block } показывает скрытые кнопки */
-  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:var(--brand); color:var(--accent-ink); padding:0 14px 0 24px; display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
-  .tools { margin-left:auto; display:flex; align-items:center; gap:6px; font-size:13px; }
-  #me-name { background:none; border:none; color:var(--accent-ink); font:inherit; cursor:pointer; padding:6px 6px; border-radius:6px;
-             opacity:.95; margin-right:2px; white-space:nowrap; max-width:240px; overflow:hidden; text-overflow:ellipsis; }
-  #me-name:hover { background:rgba(255,255,255,.14); }
-  #logout { background:rgba(255,255,255,.14); color:var(--accent-ink); border:none; border-radius:6px; padding:6px 10px; font:inherit; cursor:pointer; }
-  #logout:hover { background:rgba(255,255,255,.24); }
-  #theme { width:36px; height:36px; border-radius:50%; border:none; background:none;
-           color:var(--accent-ink); cursor:pointer; display:grid; place-items:center; }
-  #theme:hover { background:rgba(255,255,255,.14); }
-  #theme svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  body { margin:0; font-family:var(--font); font-feature-settings:"clig" 0, "liga" 0; font-size:16px; line-height:1.5;
+         background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; }
+  :focus-visible { outline:2px solid var(--ash); outline-offset:2px; }
+  /* Floating Primary Navigation: рамка Graphite Edge, радиус 10, отступы 16/8 */
+  header { position:sticky; top:8px; z-index:5; margin:8px 16px 0; min-height:56px; padding:8px 8px 8px 16px;
+           background:var(--bg); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow-sm);
+           display:flex; gap:8px 16px; align-items:center; flex-wrap:wrap; }
+  header b { display:flex; align-items:center; gap:8px; font-size:14px; line-height:20px; font-weight:600; white-space:nowrap; }
+  header b::before { content:""; width:24px; height:24px; flex:none; background:url("/public/favicon.svg") center / contain no-repeat; }
+  .tools { margin-left:auto; display:flex; align-items:center; gap:8px; font-size:14px; }
+  #me-name { background:none; border:none; color:var(--muted); font:inherit; font-weight:500; cursor:pointer; padding:6px 8px;
+             border-radius:8px; white-space:nowrap; max-width:240px; overflow:hidden; text-overflow:ellipsis; }
+  #me-name:hover { color:var(--ink); background:var(--soft); }
+  /* Transparent Navigation Control */
+  #logout { background:transparent; color:var(--muted); border:1px solid var(--hair); border-radius:8px; padding:6px 16px;
+            font:inherit; font-weight:500; line-height:20px; cursor:pointer; }
+  #logout:hover { color:var(--ink); background:var(--soft); }
+  #theme { width:32px; height:32px; border-radius:8px; border:none; background:none; color:var(--muted); cursor:pointer; display:grid; place-items:center; }
+  #theme:hover { color:var(--ink); background:var(--soft); }
+  #theme svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
   :root[data-theme="dark"] #theme .i-sun, :root:not([data-theme="dark"]) #theme .i-moon { display:none; }
-  header b { font-size:18px; padding:14px 0; }
   header nav { display:flex; gap:4px; flex-wrap:wrap; }
-  header nav a { color:var(--accent-ink); text-decoration:none; font-size:14px; padding:16px 10px; opacity:.85; border-bottom:3px solid transparent; }
-  header nav a:hover { opacity:1; background:rgba(255,255,255,.08); }
-  header nav a.active { opacity:1; border-bottom-color:#fff; font-weight:600; }
-  main { max-width:1100px; margin:24px auto; padding:0 16px; }
-  .grid { display:grid; grid-template-columns: 2fr 1fr; gap:16px; }
-  .cards { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:16px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
-  h1 { font-size:20px; margin:0 0 16px; }
-  h2 { font-size:16px; margin:0 0 10px; }
-  li { margin:6px 0; color:var(--muted); }
-  main a:not(.btn) { color:var(--accent); }
-  .note { font-size:13px; color:var(--muted); }
-  .meta { font-size:12px; color:var(--muted); margin-bottom:6px; }
-  .tag { display:inline-block; font-size:11px; background:var(--soft); color:var(--accent); border-radius:6px; padding:2px 6px; margin-left:6px; }
-  a.btn, button.btn { display:inline-block; background:var(--brand); color:#fff; border:none; border-radius:8px; padding:8px 12px;
-           font-size:13px; text-decoration:none; cursor:pointer; margin-top:8px; }
-  a.btn.ghost, button.btn.ghost { background:var(--soft); color:var(--accent); }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  th, td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { font-size:12px; color:var(--muted); font-weight:600; }
+  header nav a { color:var(--muted); text-decoration:none; font-size:14px; line-height:20px; font-weight:500; padding:6px 12px; border-radius:8px; }
+  header nav a:hover { color:var(--ink); background:var(--soft); }
+  header nav a.active { color:var(--ink); background:var(--soft); box-shadow:inset 0 0 0 1px var(--line); }
+  main { max-width:1152px; margin:32px auto 128px; padding:0 16px; }
+  .grid { display:grid; grid-template-columns: 2fr 1fr; gap:8px; }
+  .cards { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:8px; }
+  /* Feature Mosaic Card */
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  h1 { font-size:36px; line-height:1.11; font-weight:500; letter-spacing:-0.5px; margin:0 0 24px; }
+  h2 { font-size:20px; line-height:1.4; font-weight:500; margin:0 0 8px; display:flex; align-items:center; gap:8px; }
+  h2 svg { width:20px; height:20px; flex:none; fill:none; stroke:var(--muted); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  li { margin:8px 0; color:var(--muted); }
+  li::marker { color:var(--ash); }
+  main a:not(.btn) { color:var(--accent); text-decoration:none; }
+  main a:not(.btn):hover { text-decoration:underline; text-underline-offset:3px; }
+  code { font-size:.875em; background:var(--soft); border:1px solid var(--line); border-radius:4px; padding:1px 6px; }
+  .note { font-size:14px; line-height:20px; color:var(--muted); }
+  .meta { font-size:12px; line-height:1.33; color:var(--muted); margin-bottom:8px; }
+  .tag { display:inline-block; font-size:12px; line-height:1.33; color:var(--muted); border:1px solid var(--line); border-radius:20px; padding:2px 8px; margin-left:8px; }
+  /* Pale Conversion Button / Charcoal Secondary Button */
+  a.btn, button.btn { display:inline-block; background:var(--brand); color:var(--brand-ink); border:1px solid var(--hair); border-radius:8px;
+           padding:8px 16px; font:inherit; font-size:14px; line-height:20px; font-weight:500; text-decoration:none; cursor:pointer;
+           margin-top:8px; box-shadow:var(--shadow-subtle-3); }
+  a.btn:hover, button.btn:hover { opacity:.9; }
+  a.btn.ghost, button.btn.ghost { background:var(--ghost); color:var(--ink); border-color:var(--steel); box-shadow:var(--shadow-subtle-2); }
+  :root[data-theme="light"] a.btn.ghost, :root[data-theme="light"] button.btn.ghost { border-color:var(--line); }
+  a.btn.ghost:hover, button.btn.ghost:hover { opacity:1; background:var(--steel); }
+  :root[data-theme="light"] a.btn.ghost:hover, :root[data-theme="light"] button.btn.ghost:hover { background:var(--soft); }
+  button.btn:disabled { opacity:.5; cursor:default; }
+  table { width:100%; border-collapse:collapse; font-size:14px; line-height:20px; }
+  th, td { text-align:left; padding:12px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:12px; line-height:1.33; color:var(--muted); font-weight:500; }
   .faq button { background:none; border:none; padding:0; color:var(--accent); cursor:pointer; text-align:left; font:inherit; }
-  .answer { margin-top:6px; font-size:13px; color:var(--ink); background:var(--soft); border-radius:8px; padding:8px 10px; display:none; }
+  .answer { margin-top:8px; font-size:14px; line-height:20px; color:var(--ink); background:var(--soft); border:1px solid var(--line);
+            border-radius:10px; padding:8px 12px; display:none; }
   .answer .text { white-space:pre-wrap; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:5; line-clamp:5; overflow:hidden; }
-  .answer .more { display:none; background:none; border:none; padding:0; margin-top:4px; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; }
-  #full { width:650px; height:500px; max-width:calc(100vw - 32px); max-height:calc(100vh - 32px); padding:0; border:none;
-          border-radius:14px; box-shadow:0 12px 40px rgba(0,0,0,.3); color:var(--ink); background:var(--card); }
+  .answer .more { display:none; background:none; border:none; padding:0; margin-top:4px; color:var(--accent); font:inherit; font-weight:500; cursor:pointer; }
+  #full { width:650px; height:500px; max-width:calc(100vw - 32px); max-height:calc(100vh - 32px); padding:0; border:1px solid var(--line);
+          border-radius:10px; box-shadow:var(--shadow-md); color:var(--ink); background:var(--bg); }
   #full[open] { display:flex; flex-direction:column; }
-  #full::backdrop { background:rgba(20,28,45,.45); }
-  #full .bar { background:var(--brand); color:#fff; padding:10px 14px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; font-weight:600; }
-  #full .bar button { background:none; border:none; color:#fff; font-size:20px; line-height:1; cursor:pointer; }
-  #full .body { flex:1; overflow:auto; padding:14px 18px; white-space:pre-wrap; font-size:14px; line-height:1.5; }
+  #full::backdrop { background:rgba(0,0,0,.6); }
+  /* Шапка окна — как Top Announcement Bar: Charcoal Surface, рамка Graphite Edge, 14/600 */
+  #full .bar { background:var(--surface); color:var(--ink); padding:8px 8px 8px 16px; border-bottom:1px solid var(--line);
+               display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:14px; line-height:20px; font-weight:600; }
+  #full .bar button, #panel .bar button { width:32px; height:32px; flex:none; display:grid; place-items:center; background:none; border:1px solid var(--hair);
+               border-radius:8px; color:var(--muted); font-size:18px; line-height:1; cursor:pointer; }
+  #full .bar button:hover, #panel .bar button:hover { color:var(--ink); background:var(--soft); }
+  #full .body { flex:1; overflow:auto; padding:16px; white-space:pre-wrap; font-size:14px; line-height:1.5; }
   .ok { color:var(--ok); } .bad { color:var(--bad); }
-  input, select, textarea { font:inherit; font-size:14px; padding:7px 9px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); }
+  input, select, textarea { font:inherit; font-size:14px; line-height:20px; padding:8px 12px; border:1px solid var(--line); border-radius:10px;
+                            background:var(--surface); color:var(--ink); }
+  input:focus, select:focus, textarea:focus { outline:none; border-color:var(--steel); }
   .form-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .form-row input { flex:1 1 170px; min-width:0; }
   .form-row .btn { margin-top:0; }
-  .notice { margin-top:12px; padding:10px 12px; border-radius:8px; background:var(--soft); font-size:14px; }
+  .notice { margin-top:16px; padding:12px 16px; border-radius:10px; background:var(--soft); border:1px solid var(--line); font-size:14px; }
   .notice code { font-size:15px; font-weight:700; letter-spacing:.5px; }
-  button.link { background:none; border:none; padding:0; margin-right:12px; color:var(--accent); cursor:pointer; font:inherit; font-size:13px; white-space:nowrap; }
+  button.link { background:none; border:none; padding:0; margin-right:12px; color:var(--accent); cursor:pointer; font:inherit; font-size:14px; white-space:nowrap; }
   button.link.danger { color:var(--bad); }
-  button.link:disabled { color:var(--muted); cursor:default; }
+  button.link:disabled { color:var(--ash); cursor:default; }
   .scroll { overflow-x:auto; }
   .pw-field { position:relative; flex:1 1 200px; display:flex; min-width:0; }
   .pw-field input { flex:1; min-width:0; padding-right:36px; }
   .eye { position:absolute; right:4px; top:50%; transform:translateY(-50%); background:none; border:none; padding:4px;
          color:var(--muted); cursor:pointer; display:grid; }
-  .eye svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-  .dlg { width:460px; max-width:calc(100vw - 32px); padding:20px; border:none; border-radius:14px; background:var(--card);
-         color:var(--ink); box-shadow:0 12px 40px rgba(0,0,0,.3); }
-  .dlg::backdrop { background:rgba(20,28,45,.45); }
-  .dlg .err { font-size:13px; min-height:1em; }
+  .eye svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+  .dlg { width:460px; max-width:calc(100vw - 32px); padding:24px; border:1px solid var(--line); border-radius:10px; background:var(--bg);
+         color:var(--ink); box-shadow:var(--shadow-md); }
+  .dlg::backdrop { background:rgba(0,0,0,.6); }
+  .dlg .err { font-size:14px; min-height:1em; }
   .dlg .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
-  .dlg label { display:block; font-size:13px; color:var(--muted); margin:10px 0 0; }
+  .dlg label { display:block; font-size:14px; color:var(--muted); margin:12px 0 0; }
   .dlg label .pw-field { margin-top:4px; }
-  h3 { font-size:14px; margin:16px 0 4px; }
-  .subnav { display:flex; gap:6px; flex-wrap:wrap; margin:-6px 0 16px; }
-  .subnav a { padding:6px 12px; border-radius:999px; background:var(--soft); text-decoration:none; font-size:13px; }
-  main .subnav a.active { background:var(--brand); color:#fff; }
-  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
+  h3 { font-size:16px; line-height:1.25; font-weight:600; margin:16px 0 8px; }
+  .subnav { display:flex; gap:8px; flex-wrap:wrap; margin:-8px 0 24px; }
+  .subnav a { padding:6px 16px; border-radius:9999px; border:1px solid var(--hair); text-decoration:none; font-size:14px; font-weight:500; }
+  main .subnav a { color:var(--muted); }
+  main .subnav a:hover { color:var(--ink); text-decoration:none; background:var(--soft); }
+  main .subnav a.active { background:var(--brand); color:var(--brand-ink); border-color:transparent; }
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; }
   .form-grid .full { grid-column:1 / -1; }
   .f { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
   .f input, .f select, .f textarea { width:100%; }
-  .f.check { flex-direction:row; align-items:center; gap:8px; font-size:13px; color:var(--ink); }
-  .f.check input { width:auto; }
-  .stats { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; }
-  .stat { background:var(--soft); border-radius:8px; padding:10px 12px; }
-  .stat b { display:block; font-size:17px; margin-top:2px; overflow-wrap:anywhere; }
+  .f.check { flex-direction:row; align-items:center; gap:8px; font-size:14px; color:var(--ink); }
+  .f.check input { width:auto; accent-color:var(--brand); }
+  .stats { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 16px; }
+  .stat b { display:block; font-size:20px; line-height:1.4; font-weight:500; margin-top:2px; overflow-wrap:anywhere; }
   .stat span { font-size:12px; color:var(--muted); }
   td .note { margin-top:2px; }
-  .kb-doc + .kb-doc { margin-top:18px; }
+  .kb-doc + .kb-doc { margin-top:24px; }
   section[hidden] { display:none; }
-  #fab { position:fixed; right:24px; bottom:24px; width:64px; height:64px; border-radius:50%; border:none;
-         background:var(--brand); color:#fff; font-size:28px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.25); }
-  #fab .hint { position:absolute; right:74px; top:16px; white-space:nowrap; background:var(--card); color:var(--ink);
-               font-size:13px; padding:6px 10px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.15); }
-  #panel { position:fixed; right:24px; bottom:100px; width:520px; height:640px; max-height:calc(100vh - 120px);
-           background:var(--card); border-radius:14px; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,.3); display:none;
+  /* Кнопка виджета — Dark Pill Icon Button (увеличена до 56 px для заметности) */
+  #fab { position:fixed; right:24px; bottom:24px; width:56px; height:56px; border-radius:9999px; border:1px solid var(--line);
+         background:var(--surface); color:var(--ink); cursor:pointer; display:grid; place-items:center; box-shadow:var(--shadow-sm); z-index:11; }
+  #fab:hover { border-color:var(--steel); }
+  #fab svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  #fab .hint { position:absolute; right:68px; top:12px; white-space:nowrap; background:var(--surface); color:var(--ink); border:1px solid var(--line);
+               font-size:14px; line-height:20px; font-weight:500; padding:4px 12px; border-radius:9999px; box-shadow:var(--shadow-sm); }
+  #panel { position:fixed; right:24px; bottom:96px; width:520px; height:640px; max-height:calc(100vh - 120px);
+           background:var(--bg); border:1px solid var(--line); border-radius:10px; overflow:hidden; box-shadow:var(--shadow-md); display:none;
            flex-direction:column; z-index:10; }
   #panel.open { display:flex; }
-  #panel .bar { background:var(--brand); color:#fff; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; }
-  #panel .bar button { background:none; border:none; color:#fff; font-size:20px; cursor:pointer; }
-  #panel iframe { border:0; flex:1; width:100%; }
+  #panel .bar { background:var(--surface); color:var(--ink); padding:8px 8px 8px 16px; border-bottom:1px solid var(--line);
+                display:flex; justify-content:space-between; align-items:center; font-size:14px; line-height:20px; font-weight:600; }
+  #panel iframe { border:0; flex:1; width:100%; background:var(--bg); }
   @media (max-width: 700px) {
-    .grid { grid-template-columns:1fr; } header nav a { padding:10px 8px; }
-    header { row-gap:0; } header nav { order:3; flex-basis:100%; } #me-name { max-width:170px; }
+    header { margin:8px 8px 0; padding:8px; }
+    h1 { font-size:24px; line-height:1.17; font-weight:600; letter-spacing:0; }
+    .grid { grid-template-columns:1fr; } header nav a { padding:6px 8px; }
+    header { row-gap:4px; } header nav { order:3; flex-basis:100%; } #me-name { max-width:170px; }
     .form-grid { grid-template-columns:1fr; }
-    #panel { right:8px; left:8px; width:auto; bottom:96px; } #fab .hint { display:none; }
+    #panel { right:8px; left:8px; width:auto; bottom:88px; } #fab .hint { display:none; }
+    #fab { right:16px; bottom:16px; }
     #tab-docs th:nth-child(3), #tab-docs td:nth-child(3) { display:none; }
   }
 </style>
@@ -177,23 +224,23 @@
     <h1>Сервисы</h1>
     <div class="cards">
       <div class="card">
-        <h2>💬 Помощник по документообороту</h2>
+        <h2><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>Помощник по документообороту</h2>
         <p class="note">Вопросы по Инструкции, согласующие по Матрице, сроки, «куда обратиться».</p>
         <button class="btn" data-open-chat>Открыть в окне</button>
         <a class="btn ghost" href="/?chat" target="_blank" rel="noopener">Открыть на отдельной странице</a>
       </div>
       <div class="card">
-        <h2>📝 Подготовка документа по модулю</h2>
+        <h2><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>Подготовка документа по модулю</h2>
         <p class="note">Помощник подберёт модуль, задаст вопросы и выдаст черновик .docx с чек-листом требований.</p>
         <button class="btn" data-open-chat>Подготовить документ</button>
       </div>
       <div class="card">
-        <h2>🔍 Проверка черновика</h2>
+        <h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Проверка черновика</h2>
         <p class="note">Загрузите .docx или .pdf в окно помощника (скрепка) — получите отчёт с замечаниями и пунктами Инструкции.</p>
         <button class="btn" data-open-chat>Проверить черновик</button>
       </div>
       <div class="card">
-        <h2>⚙️ Статус системы</h2>
+        <h2><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Статус системы</h2>
         <div id="health" class="note">Проверка…</div>
         <button class="btn ghost" id="health-refresh">Обновить</button>
       </div>
@@ -429,7 +476,7 @@
   <div class="bar"><span class="title"></span><button id="full-close" aria-label="Закрыть">×</button></div>
   <div class="body"></div>
 </dialog>
-<button id="fab" aria-label="Открыть помощника">💬<span class="hint">Спросить про документооборот</span></button>
+<button id="fab" aria-label="Открыть помощника"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01" stroke-width="2.25"/></svg><span class="hint">Спросить про документооборот</span></button>
 
 <script>
   const panel = document.getElementById('panel'), frame = document.getElementById('frame');
@@ -441,27 +488,24 @@
   });
   document.querySelectorAll('[data-open-chat]').forEach(b => b.onclick = openChat);
 
-  // --- тема: как в системе, кнопка ☀/☾ переключает. Ключ общий с чатом Chainlit (тот же адрес),
-  // поэтому чат в окне виджета меняет тему вместе с порталом, а смена темы в чате меняет портал.
-  const THEME_KEY = 'vite-ui-theme', sysDark = matchMedia('(prefers-color-scheme: dark)');
+  // --- тема: тёмная по умолчанию (DESIGN.md «Graphite»), кнопка ☀/☾ переключает. Ключ общий с чатом Chainlit
+  // (тот же адрес), поэтому чат в окне виджета меняет тему вместе с порталом, а смена темы в чате меняет портал.
+  const THEME_KEY = 'vite-ui-theme';
   const themeBtn = document.getElementById('theme');
   let themeMem = null;   // если хранилище браузера недоступно
   const savedTheme = () => { try { return localStorage.getItem(THEME_KEY); } catch (e) { return themeMem; } };
-  const sysTheme = () => sysDark.matches ? 'dark' : 'light';
   function applyTheme() {
-    const t = savedTheme(), cur = t === 'light' || t === 'dark' ? t : sysTheme();
+    const cur = savedTheme() === 'light' ? 'light' : 'dark';
     document.documentElement.dataset.theme = cur;
     themeBtn.title = cur === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему';
     themeBtn.setAttribute('aria-label', themeBtn.title);
   }
   themeBtn.onclick = () => {
-    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-    themeMem = next === sysTheme() ? 'system' : next;   // вернулись к теме системы — снова следуем за ней
+    themeMem = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     try { localStorage.setItem(THEME_KEY, themeMem); } catch (e) { /* тема живёт до перезагрузки */ }
     applyTheme();
   };
   window.addEventListener('storage', e => { if (e.key === THEME_KEY) applyTheme(); });
-  sysDark.addEventListener('change', applyTheme);
   applyTheme();
 
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

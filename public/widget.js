@@ -2,7 +2,8 @@
 
    Подключение — одна строка на любой странице портала:
      <script src="https://<адрес помощника>/widget.js" defer></script>
-   Необязательные атрибуты: data-title (заголовок окна), data-label (подсказка у кнопки), data-color (цвет).
+   Необязательные атрибуты: data-title (заголовок окна), data-label (подсказка у кнопки), data-color (фон кнопки;
+   по умолчанию — оформление DESIGN.md «Graphite»: тёмная кнопка-пилюля, окно с рамкой Graphite Edge).
 
    Чат открывается в iframe с адреса помощника и требует входа. Адрес портала должен быть в
    config.yaml → portal.embed_origins (иначе браузер не покажет чат в iframe: frame-ancestors).
@@ -12,33 +13,44 @@
   if (!me || window.__douAssistantWidget) return;
   window.__douAssistantWidget = true;
   const base = new URL(me.src, location.href).origin;
-  const color = /^#[0-9a-f]{3,8}$/i.test(me.dataset.color || '') ? me.dataset.color : '#1f5fae';
+  const color = /^#[0-9a-f]{3,8}$/i.test(me.dataset.color || '') ? me.dataset.color : '';
+  const font = "'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
   const host = document.createElement('div');
   host.id = 'dou-assistant-widget';
   const root = host.attachShadow({mode: 'open'});
+  // Шрифт Inter на страницу портала не подключаем (@font-face из Shadow DOM не работает, а общий задел бы портал):
+  // подписи кнопки и окна — Inter, если он есть на портале, иначе системный шрифт; сам чат в iframe — Inter
   root.innerHTML = `<style>
     :host { all: initial; }
-    .fab { position: fixed; right: 24px; bottom: 24px; width: 60px; height: 60px; border-radius: 50%; border: none;
-           background: ${color}; color: #fff; font-size: 26px; cursor: pointer; z-index: 2147483000;
-           box-shadow: 0 6px 20px rgba(0,0,0,.25); }
-    .hint { position: absolute; right: 70px; top: 15px; white-space: nowrap; background: #fff; color: #1d2433;
-            font: 13px/1.3 system-ui, -apple-system, 'Segoe UI', sans-serif; padding: 6px 10px; border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+    /* DESIGN.md «Graphite»: Dark Pill Icon Button, рамка Graphite Edge, окно — Obsidian Canvas с радиусом 10 px */
+    .fab { position: fixed; right: 24px; bottom: 24px; width: 56px; height: 56px; border-radius: 9999px;
+           border: 1px solid #262626; background: ${color || '#171717'}; color: #fafafa; cursor: pointer; z-index: 2147483000;
+           display: grid; place-items: center; box-shadow: rgba(0,0,0,.25) 0 4px 4px 0; }
+    .fab:hover { border-color: #464646; }
+    .fab:focus-visible, .close:focus-visible { outline: 2px solid #737373; outline-offset: 2px; }
+    .fab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .hint { position: absolute; right: 68px; top: 12px; white-space: nowrap; background: #171717; color: #fafafa;
+            border: 1px solid #262626; font: 500 14px/20px ${font}; padding: 4px 12px; border-radius: 9999px;
+            box-shadow: rgba(0,0,0,.25) 0 4px 4px 0; }
     .panel { position: fixed; right: 24px; bottom: 96px; width: 520px; height: 640px; max-height: calc(100vh - 120px);
-             display: none; flex-direction: column; background: #fff; border-radius: 14px; overflow: hidden;
-             box-shadow: 0 12px 40px rgba(0,0,0,.3); z-index: 2147483000; }
+             display: none; flex-direction: column; background: #0a0a0a; border: 1px solid #262626; border-radius: 10px;
+             overflow: hidden; box-shadow: rgba(0,0,0,.3) 0 8px 10px 0; z-index: 2147483000; }
     .panel.open { display: flex; }
-    .bar { background: ${color}; color: #fff; padding: 10px 14px; display: flex; justify-content: space-between;
-           align-items: center; font: 600 15px/1.3 system-ui, -apple-system, 'Segoe UI', sans-serif; }
-    .bar button { background: none; border: none; color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
-    iframe { border: 0; flex: 1; width: 100%; }
-    @media (max-width: 700px) { .panel { left: 8px; right: 8px; width: auto; } .hint { display: none; } }
+    .bar { background: #171717; color: #fafafa; padding: 8px 8px 8px 16px; border-bottom: 1px solid #262626; display: flex;
+           justify-content: space-between; align-items: center; gap: 8px; font: 600 14px/20px ${font}; }
+    .close { width: 32px; height: 32px; display: grid; place-items: center; background: none; border: 1px solid rgba(255,255,255,.1);
+             border-radius: 8px; color: #a1a1a1; font: 18px/1 ${font}; cursor: pointer; }
+    .close:hover { color: #fafafa; background: #262626; }
+    iframe { border: 0; flex: 1; width: 100%; background: #0a0a0a; }
+    @media (max-width: 700px) { .panel { left: 8px; right: 8px; width: auto; bottom: 88px; } .fab { right: 16px; bottom: 16px; } .hint { display: none; } }
   </style>
   <div class="panel" role="dialog"><div class="bar"><span class="title"></span>
     <button class="close" type="button" aria-label="Закрыть">×</button></div>
     <iframe title="Чат-помощник по документообороту" allow="clipboard-write"></iframe></div>
-  <button class="fab" type="button" aria-label="Открыть помощника">💬<span class="hint"></span></button>`;
+  <button class="fab" type="button" aria-label="Открыть помощника"><svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01" stroke-width="2.25"/></svg>
+    <span class="hint"></span></button>`;
 
   const title = me.dataset.title || 'Помощник по документообороту';
   root.querySelector('.title').textContent = title;

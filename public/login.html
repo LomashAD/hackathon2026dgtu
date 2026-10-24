@@ -4,35 +4,51 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Вход — Внутренний портал</title>
+<link rel="icon" href="/public/favicon.svg">
+<link rel="stylesheet" href="/public/fonts/inter.css">
 <script>
-  // Тема до первой отрисовки: выбор кнопкой ☀/☾ (общий с порталом и чатом) или тема системы
+  // Тема до первой отрисовки: выбор кнопкой ☀/☾ (общий с порталом и чатом), иначе тёмная (DESIGN.md «Graphite»)
   (() => { let t = null; try { t = localStorage.getItem('vite-ui-theme'); } catch (e) {}
-    document.documentElement.dataset.theme = t === 'light' || t === 'dark' ? t
-      : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; })();
+    document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark'; })();
 </script>
 <style>
-  :root { --bg:#f4f6f9; --card:#fff; --ink:#1d2433; --muted:#5b6475; --brand:#1f5fae; --line:#dde3ec; --bad:#b3261e; color-scheme:light; }
-  :root[data-theme="dark"] { --bg:#11151c; --card:#1a2029; --ink:#e6e9ef; --muted:#a3acbb; --brand:#2a64ad; --line:#2c3542; --bad:#f2857d; color-scheme:dark; }
+  /* DESIGN.md «Graphite»: Obsidian Canvas, рамки Graphite Edge, Inter, кнопка входа — Pale Conversion Button */
+  :root { --bg:#0a0a0a; --card:#0a0a0a; --field:#171717; --ink:#fafafa; --muted:#a1a1a1; --ash:#737373; --line:#262626; --steel:#464646;
+          --brand:#e5e5e5; --brand-ink:#171717; --hair:rgba(255,255,255,.1); --soft:#171717; --bad:#f2857d; color-scheme:dark;
+          --shadow-subtle-3:rgb(255,255,255) 0px 1px 0px 0px inset, rgba(0,0,0,.1) 0px -2px 6px 0px inset; }
+  :root[data-theme="light"] { --bg:#fafafa; --card:#ffffff; --field:#ffffff; --ink:#0a0a0a; --muted:#666666; --line:#e5e5e5; --steel:#a1a1a1;
+          --brand:#171717; --brand-ink:#fafafa; --hair:rgba(0,0,0,.1); --soft:#f0f0f0; --bad:#b3261e; color-scheme:light;
+          --shadow-subtle-3:rgba(255,255,255,.12) 0px 1px 0px 0px inset, rgba(0,0,0,.1) 0px -2px 6px 0px inset; }
   * { box-sizing:border-box; }
-  body { margin:0; min-height:100vh; display:flex; flex-direction:column; font-family:system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-         background:var(--bg); color:var(--ink); }
-  header { background:var(--brand); color:#fff; padding:14px 64px 14px 24px; position:relative; font-size:18px; font-weight:700; }
-  #theme { position:absolute; right:14px; top:8px; width:36px; height:36px; border-radius:50%; border:none; background:none; color:#fff;
-           cursor:pointer; display:grid; place-items:center; }
-  #theme:hover { background:rgba(255,255,255,.14); }
-  #theme svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column; background:var(--bg); color:var(--ink);
+         font-family:'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         font-feature-settings:"clig" 0, "liga" 0; -webkit-font-smoothing:antialiased; }
+  :focus-visible { outline:2px solid var(--ash); outline-offset:2px; }
+  header { position:relative; margin:8px 16px 0; min-height:56px; padding:8px 56px 8px 16px; display:flex; align-items:center; gap:8px;
+           border:1px solid var(--line); border-radius:10px; background:var(--bg); box-shadow:rgba(0,0,0,.25) 0px 4px 4px 0px;
+           font-size:14px; line-height:20px; font-weight:600; }
+  header::before { content:""; width:24px; height:24px; flex:none; background:url("/public/favicon.svg") center / contain no-repeat; }
+  #theme { position:absolute; right:8px; top:50%; transform:translateY(-50%); width:32px; height:32px; border-radius:8px; border:none;
+           background:none; color:var(--muted); cursor:pointer; display:grid; place-items:center; }
+  #theme:hover { color:var(--ink); background:var(--soft); }
+  #theme svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
   :root[data-theme="dark"] #theme .i-sun, :root:not([data-theme="dark"]) #theme .i-moon { display:none; }
   main { flex:1; display:grid; place-items:center; padding:24px 16px; }
-  form { width:100%; max-width:360px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:24px; }
-  h1 { font-size:20px; margin:0 0 4px; }
-  .note { font-size:13px; color:var(--muted); margin:0 0 18px; }
-  label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
-  input { width:100%; font:inherit; font-size:15px; padding:9px 11px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); }
-  input:focus { outline:2px solid var(--brand); outline-offset:-1px; }
-  button[type=submit] { width:100%; margin-top:18px; padding:10px; font:inherit; font-weight:600; color:#fff; background:var(--brand);
-                        border:none; border-radius:8px; cursor:pointer; }
-  button[type=submit]:disabled { opacity:.6; cursor:default; }
-  #error { color:var(--bad); font-size:13px; margin-top:12px; min-height:1em; }
+  form { width:100%; max-width:380px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:32px 24px 24px;
+         box-shadow:rgba(101,129,128,.15) 0px 0px 2px 2px inset, rgba(32,47,46,.15) 0px 0px 4px 4px inset; }
+  h1 { font-size:24px; line-height:1.17; font-weight:600; margin:0 0 8px; }
+  .note { font-size:14px; line-height:20px; color:var(--muted); margin:0 0 16px; }
+  label { display:block; font-size:14px; line-height:20px; font-weight:500; color:var(--muted); margin:16px 0 8px; }
+  input { width:100%; font:inherit; font-size:16px; line-height:20px; padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+          background:var(--field); color:var(--ink); }
+  input:focus { outline:none; border-color:var(--steel); }
+  button[type=submit] { width:100%; margin-top:24px; padding:10px 16px; font:inherit; font-size:14px; line-height:20px; font-weight:500;
+                        color:var(--brand-ink); background:var(--brand); border:1px solid var(--hair); border-radius:8px; cursor:pointer;
+                        box-shadow:var(--shadow-subtle-3); }
+  button[type=submit]:hover { opacity:.9; }
+  button[type=submit]:disabled { opacity:.5; cursor:default; }
+  #error { color:var(--bad); font-size:14px; line-height:20px; margin-top:12px; min-height:1em; }
+  @media (max-width: 640px) { header { margin:8px 8px 0; } form { padding:24px 16px 16px; } }
 </style>
 </head>
 <body>
@@ -55,22 +71,20 @@
   </form>
 </main>
 <script>
-  const KEY = 'vite-ui-theme', sysDark = matchMedia('(prefers-color-scheme: dark)'), btn = document.getElementById('theme');
-  const sysTheme = () => sysDark.matches ? 'dark' : 'light';
+  const KEY = 'vite-ui-theme', btn = document.getElementById('theme');
   function applyTheme() {
     let t = null; try { t = localStorage.getItem(KEY); } catch (e) {}
-    const cur = t === 'light' || t === 'dark' ? t : sysTheme();
+    const cur = t === 'light' ? 'light' : 'dark';
     document.documentElement.dataset.theme = cur;
     btn.title = cur === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему';
     btn.setAttribute('aria-label', btn.title);
   }
   btn.onclick = () => {
     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-    try { localStorage.setItem(KEY, next === sysTheme() ? 'system' : next); } catch (e) {}
+    try { localStorage.setItem(KEY, next); } catch (e) {}
     document.documentElement.dataset.theme = next;
     applyTheme();
   };
-  sysDark.addEventListener('change', applyTheme);
   applyTheme();
 
   // После входа — на страницу, с которой пришли (только адрес этого же сайта)
