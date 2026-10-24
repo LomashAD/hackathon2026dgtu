@@ -22,6 +22,25 @@ LATIN_RE = re.compile(r"[A-Za-z]{4,}")
 VERDICT_RE = re.compile(r"\b(нельзя|запрещ\w*|недопустим\w*|допуска\w*|разреш\w*|вправе|не\s+мож\w*|не\s+могут)\b", re.I)
 NORM_RE = re.compile(r"\b(нельзя|можно|запрещ\w*|недопустим\w*|допуска\w*|разреш\w*|вправе|мож\w+|могут|обязан\w*|"
                      r"должн\w*|следует|подлеж\w*)\b", re.I)
+# Отказ («Нет, нельзя …») — только по запрету во фрагменте, который касается того же, о чём вопрос: на «Можно ли
+# подписать документ за руководителя?» по п. 8.19.12 («могут делегировать право подписи … Такое делегирование
+# не предоставляет права действовать от имени всей Организации») модель отвечала «Нет, нельзя».
+# «Нет, не нужно …» — не запрет, а «не требуется»: такой ответ этим правилом не проверяется.
+NEG_VERDICT_RE = re.compile(r"\b(нельзя|запрещ\w*|недопустим\w*|не\s+допуска\w*|не\s+разреш\w*|не\s+вправе|"
+                            r"не\s+мож\w*|не\s+могут)\b", re.I)
+NEG_NORM_RE = re.compile(r"\b(нельзя|запрещ\w*|недопустим\w*|не\s+(?:допуска|разреш|вправе|мож|могут|долж|следует|"
+                         r"подлеж|предоставл|име\w*\s+прав)\w*)", re.I)
+
+
+def _roots(text: str) -> set[str]:
+    """Корни по 4 буквам: «удалить» и «удаление» — одно действие (по 5 буквам «удали» ≠ «удале»)."""
+    return {t[:4] for t in tokens(text) if t not in GENERIC and len(t) > 2} - {"доку"}
+
+
+def ban_on_topic(src: str, question: str) -> bool:
+    """Есть ли во фрагменте запрет в предложении со словом из вопроса («документ» не в счёт)."""
+    q = _roots(question)
+    return any(NEG_NORM_RE.search(s) and q & _roots(s) for s in re.split(r"(?<=[.;!?])\s+", src))
 
 
 def foreign(text: str, src: str) -> bool:
@@ -47,6 +66,8 @@ def check_explanation(text: str, fragments: list[str], min_overlap: float = 0.55
             return False, f"число «{n}» отсутствует во фрагментах"
     if VERDICT_RE.search(text) and not NORM_RE.search(src):
         return False, "вывод о допустимости не следует из фрагментов"
+    if question and NEG_VERDICT_RE.search(text) and not ban_on_topic(src, question):
+        return False, "запрета по вопросу во фрагментах нет"
     src_t = set(tokens(src + " " + question, drop_stop=False))   # слова вопроса допустимы, числа — нет
     out_t = [t for t in tokens(text) if t not in GENERIC and len(t) > 2]
     if not out_t:
