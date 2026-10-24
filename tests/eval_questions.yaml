@@ -136,3 +136,57 @@ questions:
   - {id: h10, holdout: true, q: "Можно ли уничтожать документы, если идет судебный спор?", type: answer, role: admin, expected: [instr_dou:11.13]}
   - {id: h11, holdout: true, q: "Как подать заявку на отпуск через кадровый портал?", type: no_answer}
   - {id: h12, holdout: true, q: "Сколько стоит парковка у офиса?", type: no_answer}
+  # --- разговорная речь: сленг, опечатки, ситуации своими словами, продолжение диалога, вежливые фразы.
+  # q — одна реплика или список реплик одного диалога (оценивается ответ на последнюю).
+  # type: template — подбор шаблона (expected: id шаблона); chat — вежливая/служебная фраза (ответ без отказа).
+  # text_contains — строка, которая должна быть в ответе.
+  # Рабочий набор (colloquial: dev): фразы, на которых найдены проблемы и настраивались правила.
+  - {id: c01, colloquial: dev, q: "когда регать входящие", type: answer, expected: [instr_dou:5.6]}
+  - {id: c02, colloquial: dev, q: "скока дней на согласавание приказа", type: answer, expected: [instr_dou:10.3], text_contains: "10 рабочих дней"}
+  - {id: c03, colloquial: dev, q: "письмо пришло не по адресу", type: answer, expected: [instr_dou:5.14]}
+  - {id: c04, colloquial: dev, q: "в конверте лежали деньги", type: answer, expected: [instr_dou:5.4.3]}
+  - {id: c05, colloquial: dev, q: "бумажка пришла, а она уже зарегана в электронке", type: answer, expected: [instr_dou:5.2]}
+  - {id: c06, colloquial: dev, q: "какой шрифт ставить", type: answer, expected: [instr_dou:8.16]}
+  - {id: c07, colloquial: dev, q: "подскажи плиз как оформить гриф согласования", type: answer, expected: [instr_dou:8.21]}
+  - {id: c08, colloquial: dev, q: "скок дней на ответ гражданину", type: answer, expected: [instr_dou:6.6]}
+  - {id: c09, colloquial: dev, q: "кто визирует приказ о выходных", type: approval, expected: ["matrix_viz:internal-1"]}
+  - {id: c10, colloquial: dev, q: "с кем согласовывать письмо в минфин", type: approval, expected: ["matrix_viz:external-1"]}
+  - {id: c11, colloquial: dev, q: "начальник велел оформить приказ о вводе системы в эксплуатацию", type: template, expected: [order_is_commissioning]}
+  - {id: c12, colloquial: dev, q: "шеф сказал сделать распоряжение про рабочую группу", type: template, expected: [disp_working_group]}
+  - {id: c13, colloquial: dev, q: ["Когда регистрировать входящий документ?", "а исходящий?"], type: answer, expected: [instr_dou:7.1]}
+  - {id: c14, colloquial: dev, q: ["Кто визирует распоряжение о создании рабочей группы?", "а приказ о выходных?"], type: approval, expected: ["matrix_viz:internal-1"]}
+  - {id: c15, colloquial: dev, q: ["Сколько дней на согласование?", "распоряжение", "а для приказа?"], type: answer, expected: [instr_dou:10.3], text_contains: "10 рабочих дней"}
+  - {id: c16, colloquial: dev, q: ["Когда регистрировать входящий документ?", "спасибо, а если вечером пришло?"], type: answer, expected: [instr_dou:5.6]}
+  - {id: c17, colloquial: dev, q: "спасибо", type: chat}
+  - {id: c18, colloquial: dev, q: "ок", type: chat}
+  - {id: c19, colloquial: dev, q: "пока", type: chat}
+  - {id: c20, colloquial: dev, q: "как дела?", type: chat}
+  - {id: c21, colloquial: dev, q: "ты бот?", type: chat}
+  - {id: c22, colloquial: dev, q: ["Когда регистрировать входящий документ?", "не понял"], type: chat}
+  - {id: c23, colloquial: dev, q: "отмена", type: chat}
+  - {id: c24, colloquial: dev, q: ["Нужно подготовить распоряжение о создании рабочей группы", "отмена", "спасибо"], type: chat}
+  # Контрольный набор (colloquial: holdout): записан до доработки, правила и промпты на нём не подбирались.
+  - {id: hc01, colloquial: holdout, q: "шеф в отпуске, кто подпишет бумагу?", type: answer, expected: [instr_dou:8.19.4]}
+  - {id: hc02, colloquial: holdout, q: "скок адресатов можно впихнуть в одно письмо", type: answer, expected: [instr_dou:8.12.4]}
+  - {id: hc03, colloquial: holdout, q: "письмо вернулось обратно, че с ним делать", type: answer, expected: [instr_dou:7.16]}
+  - {id: hc04, colloquial: holdout, q: "как правильно написать адресата если это гражданин", type: answer, expected: [instr_dou:8.12.6]}
+  - {id: hc05, colloquial: holdout, q: "срок поручения поменять можно?", type: answer, expected: [instr_dou:6.10]}
+  - {id: hc06, colloquial: holdout, q: "когда можно снять доку с контроля", type: answer, expected: [instr_dou:6.15]}
+  - {id: hc07, colloquial: holdout, q: "упаковка у письма порвана пришла, что делать", type: answer, expected: [instr_dou:5.4.2]}
+  - {id: hc08, colloquial: holdout, q: "через скока отправлять исходящее после регистрации", type: answer, expected: [instr_dou:7.7]}
+  - {id: hc09, colloquial: holdout, q: "СЭД лежит, как регать документы?", type: answer, expected: [instr_dou:2.13]}
+  - {id: hc10, colloquial: holdout, q: "надо ли на письме писать слово ПИСЬМО", type: answer, expected: [instr_dou:8.6, instr_dou:9.9]}
+  - {id: hc11, colloquial: holdout, q: "кто регает приказы по кадрам", type: answer, expected: [instr_dou:7.6]}
+  - {id: hc12, colloquial: holdout, q: "дедлайн выпал на субботу — когда сдавать?", type: answer, expected: [instr_dou:6.4]}
+  - {id: hc13, colloquial: holdout, q: "кому нести на визу приказ про выходные", type: approval, expected: ["matrix_viz:internal-1"]}
+  - {id: hc14, colloquial: holdout, q: "с кем согласовывать письмо в налоговую", type: approval, expected: ["matrix_viz:external-1"]}
+  - {id: hc15, colloquial: holdout, q: "надо накидать распоряжение про аудит", type: template, expected: [disp_internal_audit]}
+  - {id: hc16, colloquial: holdout, q: "шеф велел подготовить приказ о вводе в эксплуатацию новой системы", type: template, expected: [order_is_commissioning]}
+  - {id: hc17, colloquial: holdout, q: ["когда регистрировать исходящий документ?", "а входящий?"], type: answer, expected: [instr_dou:5.6]}
+  - {id: hc18, colloquial: holdout, q: ["кто визирует распоряжение о создании рабочей группы", "а письмо в министерство?"], type: approval, expected: ["matrix_viz:external-1"]}
+  - {id: hc19, colloquial: holdout, q: "скинь телефон бухгалтерии", type: no_answer}
+  - {id: hc20, colloquial: holdout, q: "когда зарплата?", type: no_answer}
+  - {id: hc21, colloquial: holdout, q: "сколько дней отпуска положено", type: no_answer}
+  - {id: hc22, colloquial: holdout, q: "спасибо большое!", type: chat}
+  - {id: hc23, colloquial: holdout, q: "ты кто вообще", type: chat}
+  - {id: hc24, colloquial: holdout, q: "хорошо, понял", type: chat}

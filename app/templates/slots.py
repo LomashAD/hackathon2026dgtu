@@ -11,6 +11,7 @@ MONTHS = ["января", "февраля", "марта", "апреля", "ма�
           "октября", "ноября", "декабря"]
 MONTH_STEMS = ["янв", "фев", "мар", "апр", "ма", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]
 SKIP_RE = re.compile(r"^(нет|не нужн\w*|не требуется|пропусти\w*|-|—|отсутству\w*|без \w+|не отменя\w*|никак\w*)\b", re.I)
+REQUIRED_SKIP_RE = re.compile(r"^(нет|пропусти\w*|пропуск|не нужно|не требуется|-|—)\s*[.!]*$", re.I)
 YES_RE = re.compile(r"^(да|ага|конечно|верно|связан\w*|является|yes)\b", re.I)
 NO_RE = re.compile(r"^(нет|не\b|no\b)", re.I)
 ACCEPT_DEFAULT_RE = re.compile(r"^(да|ок|ok|оставь\w*|по умолчанию|подходит|согласен|верно|\+)\b", re.I)
@@ -73,6 +74,9 @@ def validate(f: dict, raw: str, values: dict) -> FieldResult:
         return FieldResult(True, "")
     if not text:
         return FieldResult(False, error="Ответ пустой.")
+    if ftype not in ("yesno", "choice") and REQUIRED_SKIP_RE.match(text):
+        return FieldResult(False, error="Этот пункт обязательный — без него черновик не собрать. "
+                                        "Не знаете, что указать, — напишите «пример».")
 
     if ftype == "date":
         d = parse_date(text)

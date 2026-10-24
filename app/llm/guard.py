@@ -12,12 +12,22 @@ GENERIC = set(tokens("""вы вам вас ваш нужно необходим�
 вечером вечер выходной выходные день дня дней тот та те такой такие нужен нужна поэтому""", drop_stop=False))
 
 NUM_RE = re.compile(r"\d+(?:[.,]\d+)*")
-FOREIGN_RE = re.compile(r"[一-鿿぀-ヿ]|[A-Za-z]{4,}")
+# Попытка переписать правила помощника: такому сообщению не помогаем вторым шансом поиска
+INJECTION_RE = re.compile(r"игнорир\w*|забудь\w* (?:вс|предыдущ|инструкц|правил)|ignore|system prompt|системн\w* "
+                          r"(?:промпт|инструкц)|ты теперь|притворись|представь,? что ты|jailbreak|developer mode", re.I)
+FOREIGN_RE = re.compile(r"[一-鿿぀-ヿ]")
+LATIN_RE = re.compile(r"[A-Za-z]{4,}")
 # Вывод о допустимости («нельзя», «не допускается») должен опираться на норму во фрагменте, а не на вопрос:
 # на «Можно ли …?» модель отвечает «Нет, нельзя …» и по пункту, где об этом ничего не сказано.
 VERDICT_RE = re.compile(r"\b(нельзя|запрещ\w*|недопустим\w*|допуска\w*|разреш\w*|вправе|не\s+мож\w*|не\s+могут)\b", re.I)
 NORM_RE = re.compile(r"\b(нельзя|можно|запрещ\w*|недопустим\w*|допуска\w*|разреш\w*|вправе|мож\w+|могут|обязан\w*|"
                      r"должн\w*|следует|подлеж\w*)\b", re.I)
+
+
+def foreign(text: str, src: str) -> bool:
+    """Иероглифы или латинские слова, которых нет в источнике («Times New Roman» из пункта 8.16 — можно)."""
+    low = src.lower()
+    return bool(FOREIGN_RE.search(text)) or any(w.lower() not in low for w in LATIN_RE.findall(text))
 
 
 def check_explanation(text: str, fragments: list[str], min_overlap: float = 0.55,
@@ -28,9 +38,9 @@ def check_explanation(text: str, fragments: list[str], min_overlap: float = 0.55
         return False, "пустой ответ"
     if len(text) > 900:
         return False, "слишком длинный ответ"
-    if FOREIGN_RE.search(text):
-        return False, "иностранный текст"
     src = " ".join(fragments)
+    if foreign(text, src + " " + question):
+        return False, "иностранный текст"
     src_nums = set(NUM_RE.findall(src))
     for n in NUM_RE.findall(text):
         if n not in src_nums:

@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 from app.config import get_config
 from app.ingest.indexer import get_collection, load_registry
-from app.retrieval.text import tokens
+from app.retrieval.text import TOKEN_RE, tokens
 from app.security.access import allowed_levels, build_where
 
 SECTION_REQ_RE = re.compile(
@@ -197,6 +197,15 @@ class Retriever:
                             break
         res.hits = top
         return res
+
+    def vocabulary(self, role: str) -> Counter:
+        """Словоформы текстов, доступных роли, с частотами — словарь для исправления опечаток
+        (app/dialog/normalize.py). Пересобирается вместе с корпусом при новой редакции."""
+        c = self._corpus(build_where(allowed_levels(role)))
+        if "vocab" not in c:
+            c["vocab"] = Counter(w.replace("ё", "е") for d in c["docs"] for w in TOKEN_RE.findall(d.lower())
+                                 if not w.isascii())
+        return c["vocab"]
 
     def get_section(self, doc_id: str, section: str, role: str) -> Hit | None:
         """Точное получение пункта (с учётом доступа)."""

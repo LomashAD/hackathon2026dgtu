@@ -100,7 +100,7 @@ async def _send(reply: Reply) -> None:
     for f in reply.files:
         elements.append(cl.File(name=f.name, path=str(f), display="inline",
                                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
-    if reply.intent not in ("help", "") and not reply.meta.get("clarification"):
+    if reply.intent not in ("help", "smalltalk", "cancel", "") and not reply.meta.get("clarification"):
         actions += [cl.Action(name="feedback", payload={"v": "up"}, label="👍"),
                     cl.Action(name="feedback", payload={"v": "down"}, label="👎")]
     if reply.meta.get("latency_ms") is not None:
