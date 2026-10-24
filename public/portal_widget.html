@@ -11,6 +11,7 @@
   (() => { let t = null; try { t = localStorage.getItem('vite-ui-theme'); } catch (e) {}
     document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark'; })();
 </script>
+<script src="/public/theme_icon.js"></script>
 <style>
   /* Оформление по DESIGN.md «Graphite»: Obsidian Canvas, рамки Graphite Edge, Inter вместо matterFont, радиусы 8/10 px.
      Светлая тема в DESIGN.md не описана — та же палитра в обратном порядке (docs/frontend_notes.md). */
@@ -50,7 +51,6 @@
   #theme { width:32px; height:32px; border-radius:8px; border:none; background:none; color:var(--muted); cursor:pointer; display:grid; place-items:center; }
   #theme:hover { color:var(--ink); background:var(--soft); }
   #theme svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
-  :root[data-theme="dark"] #theme .i-sun, :root:not([data-theme="dark"]) #theme .i-moon { display:none; }
   header nav { display:flex; gap:4px; flex-wrap:wrap; }
   header nav a { color:var(--muted); text-decoration:none; font-size:14px; line-height:20px; font-weight:500; padding:6px 12px; border-radius:8px; }
   header nav a:hover { color:var(--ink); background:var(--soft); }
@@ -200,8 +200,7 @@
   <button id="me-name" type="button" title="Мой профиль и смена пароля"></button>
   <button id="logout" type="button">Выйти</button>
   <button id="theme" type="button">
-    <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-    <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
   </button>
   </div>
 </header>

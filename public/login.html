@@ -11,6 +11,7 @@
   (() => { let t = null; try { t = localStorage.getItem('vite-ui-theme'); } catch (e) {}
     document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark'; })();
 </script>
+<script src="/public/theme_icon.js"></script>
 <style>
   /* DESIGN.md «Graphite»: Obsidian Canvas, рамки Graphite Edge, Inter, кнопка входа — Pale Conversion Button */
   :root { --bg:#0a0a0a; --card:#0a0a0a; --field:#171717; --ink:#fafafa; --muted:#a1a1a1; --ash:#737373; --line:#262626; --steel:#464646;
@@ -32,7 +33,6 @@
            background:none; color:var(--muted); cursor:pointer; display:grid; place-items:center; }
   #theme:hover { color:var(--ink); background:var(--soft); }
   #theme svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
-  :root[data-theme="dark"] #theme .i-sun, :root:not([data-theme="dark"]) #theme .i-moon { display:none; }
   main { flex:1; display:grid; place-items:center; padding:24px 16px; }
   form { width:100%; max-width:380px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:32px 24px 24px;
          box-shadow:rgba(101,129,128,.15) 0px 0px 2px 2px inset, rgba(32,47,46,.15) 0px 0px 4px 4px inset; }
@@ -54,8 +54,7 @@
 <body>
 <header>Внутренний портал Организации
   <button id="theme" type="button">
-    <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-    <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
   </button>
 </header>
 <main>

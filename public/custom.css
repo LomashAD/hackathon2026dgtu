@@ -113,6 +113,9 @@ body { color: var(--g-text); -webkit-font-smoothing: antialiased; }
 /* «О помощнике» — Transparent Navigation Control */
 #readme-button { height: 32px; padding: var(--spacing-8) var(--spacing-16); border: 1px solid var(--g-hairline); }
 #new-chat-button, #theme-toggle { width: 32px; height: 32px; }
+/* Кнопка темы: вместо двух значков lucide — один, полумесяц перетекает в солнце (public/theme_icon.js) */
+#theme-toggle > svg:not(.theme-icon) { display: none; }
+#theme-toggle .theme-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 #user-nav-button > span > span { background: var(--g-surface); color: var(--g-text); border: 1px solid var(--g-edge); font-weight: 500; }
 
 /* ------------------------------------------------------------------ сообщения */

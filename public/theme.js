@@ -1,7 +1,9 @@
 // Тема чата: по умолчанию тёмная (DESIGN.md «Graphite»: Theme: dark); кнопка в шапке (солнце — светлая,
 // полумесяц — тёмная) переключает тему одним нажатием вместо меню Chainlit. Выбор хранится под ключом Chainlit
 // «vite-ui-theme» — он общий с порталом (тот же адрес), поэтому чат во всплывающем окне меняет тему вместе
-// с порталом и наоборот.
+// с порталом и наоборот. Значок на кнопке (полумесяц перетекает в солнце) — public/theme_icon.js.
+document.head.appendChild(Object.assign(document.createElement('script'), {src: '/public/theme_icon.js'}));
+
 (() => {
   const KEY = 'vite-ui-theme', dark = matchMedia('(prefers-color-scheme: dark)');
   const sys = () => (dark.matches ? 'dark' : 'light');

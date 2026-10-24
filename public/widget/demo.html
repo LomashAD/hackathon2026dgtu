@@ -12,6 +12,7 @@
   (() => { let t = null; try { t = localStorage.getItem('vite-ui-theme'); } catch (e) {}
     document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark'; })();
 </script>
+<script src="/public/theme_icon.js"></script>
 <style>
   /* Демо-страница поп-ап виджета на Chainlit Copilot. Оформление — DESIGN.md «Graphite»:
      hero с заголовком 60/500 (-1.5px), полый многоугольник справа, кнопки Pale и Charcoal, рамка Product Demo Frame. */
@@ -58,7 +59,6 @@
   .btn-ghost { background:transparent; color:var(--fog); border:1px solid var(--hair); }
   .btn-ghost:hover { color:var(--ink); background:var(--surface); }
   .icon-btn { width:32px; height:32px; padding:0; justify-content:center; }
-  :root[data-theme="dark"] .i-sun, :root:not([data-theme="dark"]) .i-moon { display:none; }
   /* Hero */
   .hero { display:grid; grid-template-columns:minmax(0, 1.2fr) minmax(0, 1fr); gap:32px; align-items:center; padding:128px 0 72px; }
   .eyebrow { display:inline-flex; align-items:center; gap:8px; font-size:12px; line-height:1.33; color:var(--fog);
@@ -105,8 +105,7 @@
     <span class="links"><a href="/#news">Новости</a><a href="/#docs">Документы</a><a href="/#services">Сервисы</a><a href="/#dou">Раздел ДОУ</a></span>
     <span class="right">
       <button class="btn btn-ghost icon-btn" id="theme" type="button">
-        <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-        <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
       </button>
       <a class="btn btn-ghost hide-sm" href="/?chat">Чат на отдельной странице</a>
     </span>
