@@ -1,0 +1,11 @@
+/* Оформление окна Chainlit Copilot (demo.html → mountChainlitWidget({customCssUrl})). Copilot живёт в Shadow DOM,
+   поэтому стили чата подключаются сюда целиком, а ниже — кнопка и окно виджета (DESIGN.md «Graphite»). */
+@import url("/public/custom.css");
+
+/* Кнопка — Dark Pill Icon Button (56 px вместо 32 px: это главная точка входа) */
+#chainlit-copilot-button {
+  width: 56px; height: 56px; right: 24px; bottom: 24px;
+  background: var(--g-surface); color: var(--g-text);
+  border: 1px solid var(--g-edge); box-shadow: var(--shadow-sm);
+}
+#chainlit-copilot-button:hover { background: var(--g-surface); border-color: var(--g-steel); }

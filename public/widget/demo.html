@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Помощник ДОУ — виджет Copilot</title>
+<link rel="icon" href="/public/favicon.svg">
+<!-- Inter для страницы и для окна Copilot: @font-face внутри Shadow DOM браузер не подхватывает -->
+<link rel="stylesheet" href="/public/fonts/inter.css">
+<script>
+  // Тема до первой отрисовки — общий выбор с чатом и порталом, иначе тёмная (DESIGN.md «Graphite»)
+  (() => { let t = null; try { t = localStorage.getItem('vite-ui-theme'); } catch (e) {}
+    document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark'; })();
+</script>
+<style>
+  /* Демо-страница поп-ап виджета на Chainlit Copilot. Оформление — DESIGN.md «Graphite»:
+     hero с заголовком 60/500 (-1.5px), полый многоугольник справа, кнопки Pale и Charcoal, рамка Product Demo Frame. */
+  :root { --bg:#0a0a0a; --surface:#171717; --edge:#262626; --steel:#464646; --ink:#fafafa; --paper:#e5e5e5; --fog:#a1a1a1;
+          --ash:#737373; --link:#ff8833; --pale:#e5e5e5; --pale-ink:#171717; --ghost:#262626; --hair:rgba(255,255,255,.1);
+          --shadow-sm:rgba(0,0,0,.25) 0px 4px 4px 0px;
+          --shadow-subtle:rgba(101,129,128,.15) 0px 0px 2px 2px inset, rgba(32,47,46,.15) 0px 0px 4px 4px inset;
+          --shadow-subtle-2:rgba(0,0,0,.1) 0px 1px 3px 0px, rgba(0,0,0,.1) 0px 1px 2px -1px;
+          --shadow-subtle-3:rgb(255,255,255) 0px 1px 0px 0px inset, rgba(0,0,0,.1) 0px -2px 6px 0px inset;
+          --font:'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          color-scheme:dark; }
+  :root[data-theme="light"] { --bg:#fafafa; --surface:#ffffff; --edge:#e5e5e5; --steel:#a1a1a1; --ink:#0a0a0a; --fog:#666666;
+          --link:#b84d00; --pale:#171717; --pale-ink:#fafafa; --ghost:#ffffff; --hair:rgba(0,0,0,.1);
+          --shadow-sm:rgba(0,0,0,.06) 0px 4px 4px 0px; --shadow-subtle:rgba(101,129,128,.06) 0px 0px 2px 2px inset;
+          --shadow-subtle-3:rgba(255,255,255,.12) 0px 1px 0px 0px inset, rgba(0,0,0,.1) 0px -2px 6px 0px inset; color-scheme:light; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--font); font-feature-settings:"clig" 0, "liga" 0;
+         font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  :focus-visible { outline:2px solid var(--ash); outline-offset:2px; }
+  a { color:var(--link); text-decoration:none; }
+  .wrap { max-width:1152px; margin:0 auto; padding:0 16px; }
+  /* Top Announcement Bar */
+  .announce { background:var(--surface); border-bottom:1px solid var(--edge); padding:8px 16px; text-align:center;
+              font-size:14px; line-height:20px; font-weight:600; }
+  .announce span { color:var(--fog); font-weight:400; margin-left:8px; }
+  /* Floating Primary Navigation */
+  nav { margin:8px 0 0; display:flex; align-items:center; gap:8px; padding:8px 8px 8px 16px; border:1px solid var(--edge);
+        border-radius:10px; background:var(--bg); box-shadow:var(--shadow-sm); }
+  nav .brand { display:flex; align-items:center; gap:8px; font-size:14px; line-height:20px; font-weight:600; margin-right:16px; }
+  nav .brand img { width:24px; height:24px; }
+  nav .links { display:flex; gap:4px; flex-wrap:wrap; }
+  nav .links a { color:var(--fog); font-size:14px; line-height:20px; font-weight:500; padding:6px 12px; border-radius:8px; }
+  nav .links a:hover { color:var(--ink); background:var(--surface); }
+  nav .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  .btn { display:inline-flex; align-items:center; gap:8px; border-radius:8px; padding:8px 16px; font:inherit; font-size:14px;
+         line-height:20px; font-weight:500; cursor:pointer; text-decoration:none; }
+  .btn svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+  .btn-pale { background:var(--pale); color:var(--pale-ink); border:1px solid var(--hair); box-shadow:var(--shadow-subtle-3); }
+  .btn-pale:hover { opacity:.9; }
+  .btn-charcoal { background:var(--ghost); color:var(--ink); border:1px solid var(--steel); box-shadow:var(--shadow-subtle-2); }
+  :root[data-theme="light"] .btn-charcoal { border-color:var(--edge); }
+  .btn-charcoal:hover { background:var(--steel); }
+  :root[data-theme="light"] .btn-charcoal:hover { background:#f0f0f0; }
+  .btn-ghost { background:transparent; color:var(--fog); border:1px solid var(--hair); }
+  .btn-ghost:hover { color:var(--ink); background:var(--surface); }
+  .icon-btn { width:32px; height:32px; padding:0; justify-content:center; }
+  :root[data-theme="dark"] .i-sun, :root:not([data-theme="dark"]) .i-moon { display:none; }
+  /* Hero */
+  .hero { display:grid; grid-template-columns:minmax(0, 1.2fr) minmax(0, 1fr); gap:32px; align-items:center; padding:128px 0 72px; }
+  .eyebrow { display:inline-flex; align-items:center; gap:8px; font-size:12px; line-height:1.33; color:var(--fog);
+             border:1px solid var(--edge); border-radius:20px; padding:4px 10px; }
+  .eyebrow::before { content:""; width:6px; height:6px; border-radius:9999px; background:linear-gradient(90deg, #ffb931 15%, #ffffff 30%, #ffffff 40%, #2e73fc 50%); background-size:300% 100%; background-position:20% 0; }
+  h1 { margin:24px 0 0; font-size:60px; line-height:60px; font-weight:500; letter-spacing:-1.5px; }
+  .lead { margin:24px 0 0; max-width:560px; color:var(--fog); font-size:18px; line-height:1.25; }
+  .cta { margin-top:32px; display:flex; flex-wrap:wrap; gap:8px; }
+  .art { width:100%; max-width:420px; justify-self:end; }
+  .art svg { width:100%; height:auto; display:block; }
+  /* Product Demo Frame + Feature Mosaic */
+  .frame { border:1px solid var(--edge); border-radius:10px; overflow:hidden; background:var(--bg); box-shadow:var(--shadow-subtle); padding:24px; }
+  .mosaic { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin:8px 0 128px; }
+  .card { border:1px solid var(--edge); border-radius:10px; background:var(--bg); padding:16px; }
+  .card h2 { margin:0 0 8px; font-size:24px; line-height:1.17; font-weight:600; }
+  .card p { margin:0; color:var(--fog); font-size:16px; line-height:1.5; }
+  .card a, .frame a.more { display:inline-flex; align-items:center; gap:4px; margin-top:16px; font-size:16px; line-height:20px; }
+  .card a svg, .frame a.more svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+  .frame h2 { margin:0; font-size:36px; line-height:1.11; font-weight:500; }
+  .frame p { margin:16px 0 0; color:var(--fog); max-width:720px; }
+  code, pre { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  code { font-size:.875em; background:var(--surface); border:1px solid var(--edge); border-radius:4px; padding:1px 6px; }
+  pre { margin:16px 0 0; background:var(--surface); border:1px solid var(--edge); border-radius:10px; padding:12px 16px; overflow:auto;
+        font-size:14px; line-height:20px; color:var(--ink); }
+  .status { margin-top:16px; font-size:14px; line-height:20px; color:var(--fog); }
+  .status b { color:var(--ink); font-weight:500; }
+  footer { border-top:1px solid var(--edge); padding:24px 0 48px; color:var(--ash); font-size:12px; line-height:1.33; }
+  @media (max-width: 860px) {
+    .hero { grid-template-columns:1fr; padding:48px 0 32px; }
+    .art { justify-self:start; max-width:240px; order:-1; }
+    h1 { font-size:36px; line-height:1.11; letter-spacing:-0.5px; }
+    .mosaic { grid-template-columns:1fr; margin-bottom:64px; }
+    nav .links, .hide-sm { display:none; }
+    nav .brand { white-space:nowrap; }
+    .frame h2 { font-size:24px; line-height:1.17; font-weight:600; }
+  }
+</style>
+</head>
+<body>
+<div class="announce">Помощник по документообороту доступен на портале<span>— кнопка в правом нижнем углу</span></div>
+<div class="wrap">
+  <nav aria-label="Портал">
+    <span class="brand"><img src="/public/favicon.svg" alt="">Внутренний портал</span>
+    <span class="links"><a href="/#news">Новости</a><a href="/#docs">Документы</a><a href="/#services">Сервисы</a><a href="/#dou">Раздел ДОУ</a></span>
+    <span class="right">
+      <button class="btn btn-ghost icon-btn" id="theme" type="button">
+        <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <a class="btn btn-ghost hide-sm" href="/?chat">Чат на отдельной странице</a>
+    </span>
+  </nav>
+
+  <section class="hero">
+    <div>
+      <span class="eyebrow">Поп-ап виджет · Chainlit Copilot</span>
+      <h1>Ответы по Инструкции — не выходя из портала</h1>
+      <p class="lead">Помощник находит пункты Инструкции по ДОУ с процентом релевантности, подсказывает согласующих по Матрице
+        и собирает черновик .docx по модулю документа.</p>
+      <div class="cta">
+        <button class="btn btn-pale" type="button" data-open>Открыть помощника</button>
+        <a class="btn btn-charcoal" href="/">Портал с виджетом в iframe</a>
+      </div>
+      <div class="status" id="status" role="status">Проверяю вход…</div>
+    </div>
+    <div class="art" aria-hidden="true">
+      <!-- Luminous Polygon Graphic: полые повёрнутые скруглённые квадраты, размытые копии, редкий акцент спектра -->
+      <svg viewBox="0 0 420 420">
+        <defs>
+          <linearGradient id="spectrum" x1="0" y1="0" x2="1" y2="0">
+            <stop offset=".15" stop-color="#ffb931"/><stop offset=".3" stop-color="#ffffff"/>
+            <stop offset=".4" stop-color="#ffffff"/><stop offset=".5" stop-color="#2e73fc"/>
+          </linearGradient>
+          <filter id="blur"><feGaussianBlur stdDeviation="8"/></filter>
+        </defs>
+        <g fill="none" stroke="var(--ink)" stroke-width="1.5">
+          <rect x="90" y="90" width="240" height="240" rx="20" transform="rotate(-14 210 210)" opacity=".4" filter="url(#blur)"/>
+          <rect x="90" y="90" width="240" height="240" rx="20" transform="rotate(-14 210 210)" opacity=".95"/>
+          <rect x="114" y="114" width="192" height="192" rx="18" transform="rotate(8 210 210)" opacity=".5"/>
+          <rect x="60" y="60" width="300" height="300" rx="20" transform="rotate(30 210 210)" opacity=".18"/>
+          <rect x="140" y="140" width="140" height="140" rx="16" transform="rotate(22 210 210)" stroke="url(#spectrum)" stroke-width="2"/>
+        </g>
+      </svg>
+    </div>
+  </section>
+
+  <section class="frame">
+    <h2>Подключение к порталу</h2>
+    <p>Окно справа внизу — Chainlit Copilot из установленного Chainlit (<code>/copilot/index.js</code>). Он работает с адреса
+      помощника и использует вход сотрудника (cookie), поэтому страница должна открываться с того же адреса, что и чат.</p>
+    <pre>&lt;script src="https://&lt;адрес помощника&gt;/copilot/index.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  window.mountChainlitWidget({ chainlitServer: "https://&lt;адрес помощника&gt;", theme: "dark",
+    customCssUrl: "https://&lt;адрес помощника&gt;/public/widget/copilot.css" });
+&lt;/script&gt;</pre>
+    <p>Для портала на другом адресе надёжнее виджет в iframe одной строкой — <code>&lt;script src="…/widget.js" defer&gt;&lt;/script&gt;</code>:
+      Copilot с чужого адреса требует открыть помощнику CORS и вход по токену (см. docs/frontend_notes.md).</p>
+    <a class="more" href="/">Портал-макет с виджетом в iframe <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+  </section>
+
+  <section class="mosaic" aria-label="Что умеет помощник">
+    <div class="card"><h2>Ответ со ссылками</h2><p>Пункт, редакция и процент релевантности под каждым ответом; если в базе знаний ответа нет — честно скажет и подскажет, куда обратиться.</p>
+      <a href="#" data-ask="Когда нужно зарегистрировать входящий документ?">Спросить о регистрации <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+    <div class="card"><h2>Согласование</h2><p>Состав обязательных виз по Матрице, срок рассмотрения и порядок визирования по Инструкции.</p>
+      <a href="#" data-ask="Кто визирует приказ о работе в выходные дни?">Кто визирует приказ <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+    <div class="card"><h2>Черновик .docx</h2><p>Подбирает модуль документа и заполняет его по вашим ответам, шаг за шагом.</p>
+      <a href="#" data-ask="Нужно подготовить распоряжение о создании рабочей группы">Подготовить распоряжение <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+  </section>
+</div>
+<div class="wrap"><footer>Демо-страница поп-ап виджета. Чат, источники и черновики — тот же помощник, что на /?chat.</footer></div>
+
+<script>
+  // --- тема: общий ключ с чатом и порталом; Copilot перемонтируется с новой темой
+  const KEY = 'vite-ui-theme', themeBtn = document.getElementById('theme');
+  const theme = () => { try { return localStorage.getItem(KEY) === 'light' ? 'light' : 'dark'; } catch (e) { return 'dark'; } };
+  const label = () => { themeBtn.title = theme() === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'; themeBtn.setAttribute('aria-label', themeBtn.title); };
+  function setTheme(t) {
+    try { localStorage.setItem(KEY, t); } catch (e) { /* без хранилища тема живёт до перезагрузки */ }
+    document.documentElement.dataset.theme = t;
+    label();
+    if (window.__copilotMounted) { window.unmountChainlitWidget(); mount(); }
+  }
+  themeBtn.onclick = () => setTheme(theme() === 'dark' ? 'light' : 'dark');
+  window.addEventListener('storage', e => { if (e.key === KEY) setTheme(theme()); });
+  label();
+
+  // --- Copilot: только после входа (виджет использует cookie сотрудника)
+  const status = document.getElementById('status');
+  function mount() {
+    window.mountChainlitWidget({
+      chainlitServer: location.origin,
+      theme: theme(),
+      customCssUrl: '/public/widget/copilot.css',
+    });
+    window.__copilotMounted = true;
+  }
+  // Окно Copilot открыто, если у его кнопки data-state="open" (Popover Chainlit, Shadow DOM)
+  const isOpen = () => {
+    const b = document.getElementById('chainlit-copilot')?.shadowRoot?.getElementById('chainlit-copilot-button');
+    return !!b && b.dataset.state === 'open';
+  };
+  const open = () => { if (!window.__copilotMounted) location.href = loginUrl; else if (!isOpen()) window.toggleChainlitCopilot(); };
+  const loginUrl = '/login?next=' + encodeURIComponent(location.pathname);
+  document.querySelectorAll('[data-open]').forEach(b => b.onclick = open);
+  document.querySelectorAll('[data-ask]').forEach(a => a.onclick = e => {
+    e.preventDefault();
+    if (!window.__copilotMounted) { location.href = loginUrl; return; }
+    open();
+    window.sendChainlitMessage({ threadId: '', id: crypto.randomUUID(), name: 'User', type: 'user_message',
+                                 output: a.dataset.ask, createdAt: new Date().toISOString() });
+  });
+
+  fetch('/api/me', {credentials: 'same-origin'}).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(me => {
+    status.innerHTML = '';
+    status.append('Вы вошли как ', Object.assign(document.createElement('b'), {textContent: me.name}),
+                  ` · ${me.role_title}. Кнопка помощника — справа внизу.`);
+    const s = document.createElement('script');
+    s.src = '/copilot/index.js';
+    s.onload = mount;
+    s.onerror = () => { status.textContent = 'Не удалось загрузить Chainlit Copilot (/copilot/index.js).'; };
+    document.body.appendChild(s);
+  }).catch(() => {
+    status.innerHTML = '';
+    status.append('Чтобы открыть помощника, ', Object.assign(document.createElement('a'), {href: loginUrl, textContent: 'войдите'}),
+                  ' — виджет работает от имени сотрудника.');
+  });
+</script>
+</body>
+</html>
