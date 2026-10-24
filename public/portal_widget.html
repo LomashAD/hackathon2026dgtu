@@ -60,6 +60,13 @@
   main:has(> #tab-news:not([hidden])), main:has(> #tab-services:not([hidden])) { max-width:1312px; }
   .grid { display:grid; grid-template-columns: 2fr 1fr; gap:8px; }
   .cards { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:8px; }
+  /* Лента новостей: неполный последний ряд — по центру. Grid так не умеет, поэтому flex с переносом; число и ширина
+     колонок — как у .cards (от 260 px, промежуток 8 px), считаются по ширине ленты */
+  #news-body { display:flex; flex-wrap:wrap; justify-content:center; container-type:inline-size; }
+  #news-body > .card { flex:0 0 100%; min-width:0; }
+  @container (min-width: 528px) { #news-body > .card { flex-basis:calc((100% - 8px) / 2); } }
+  @container (min-width: 796px) { #news-body > .card { flex-basis:calc((100% - 16px) / 3); } }
+  @container (min-width: 1064px) { #news-body > .card { flex-basis:calc((100% - 24px) / 4); } }
   /* Feature Mosaic Card */
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
   h1 { font-size:36px; line-height:1.11; font-weight:500; letter-spacing:-0.5px; margin:0 0 24px; }
