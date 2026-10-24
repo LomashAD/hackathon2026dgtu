@@ -13,6 +13,11 @@ GENERIC = set(tokens("""вы вам вас ваш нужно необходим�
 
 NUM_RE = re.compile(r"\d+(?:[.,]\d+)*")
 FOREIGN_RE = re.compile(r"[一-鿿぀-ヿ]|[A-Za-z]{4,}")
+# Вывод о допустимости («нельзя», «не допускается») должен опираться на норму во фрагменте, а не на вопрос:
+# на «Можно ли …?» модель отвечает «Нет, нельзя …» и по пункту, где об этом ничего не сказано.
+VERDICT_RE = re.compile(r"\b(нельзя|запрещ\w*|недопустим\w*|допуска\w*|разреш\w*|вправе|не\s+мож\w*|не\s+могут)\b", re.I)
+NORM_RE = re.compile(r"\b(нельзя|можно|запрещ\w*|недопустим\w*|допуска\w*|разреш\w*|вправе|мож\w+|могут|обязан\w*|"
+                     r"должн\w*|следует|подлеж\w*)\b", re.I)
 
 
 def check_explanation(text: str, fragments: list[str], min_overlap: float = 0.55,
@@ -30,6 +35,8 @@ def check_explanation(text: str, fragments: list[str], min_overlap: float = 0.55
     for n in NUM_RE.findall(text):
         if n not in src_nums:
             return False, f"число «{n}» отсутствует во фрагментах"
+    if VERDICT_RE.search(text) and not NORM_RE.search(src):
+        return False, "вывод о допустимости не следует из фрагментов"
     src_t = set(tokens(src + " " + question, drop_stop=False))   # слова вопроса допустимы, числа — нет
     out_t = [t for t in tokens(text) if t not in GENERIC and len(t) > 2]
     if not out_t:
