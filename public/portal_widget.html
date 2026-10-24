@@ -4,11 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Внутренний портал — макет виджета</title>
+<script>
+  // Тема до первой отрисовки, чтобы не мигала: выбор кнопкой ☀/☾ или, если его нет, тема системы
+  (() => { let t = null; try { t = localStorage.getItem('vite-ui-theme'); } catch (e) {}
+    document.documentElement.dataset.theme = t === 'light' || t === 'dark' ? t
+      : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; })();
+</script>
 <style>
-  :root { --bg:#f4f6f9; --card:#fff; --ink:#1d2433; --muted:#5b6475; --accent:#1f5fae; --accent-ink:#fff; --line:#dde3ec; --soft:#eaf1fb; }
+  :root { --bg:#f4f6f9; --card:#fff; --ink:#1d2433; --muted:#5b6475; --accent:#1f5fae; --brand:#1f5fae; --accent-ink:#fff;
+          --line:#dde3ec; --soft:#eaf1fb; --ok:#1b7f3b; --bad:#b3261e; color-scheme:light; }
+  :root[data-theme="dark"] { --bg:#11151c; --card:#1a2029; --ink:#e6e9ef; --muted:#a3acbb; --accent:#7fb0f0; --brand:#2a64ad;
+          --line:#2c3542; --soft:#1f2b3c; --ok:#5cc27f; --bad:#f2857d; color-scheme:dark; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:var(--accent); color:var(--accent-ink); padding:0 24px; display:flex; gap:28px; align-items:center; flex-wrap:wrap; }
+  header { background:var(--brand); color:var(--accent-ink); padding:0 64px 0 24px; display:flex; gap:28px; align-items:center; flex-wrap:wrap; position:relative; }
+  #theme { position:absolute; right:14px; top:8px; width:36px; height:36px; border-radius:50%; border:none; background:none;
+           color:var(--accent-ink); cursor:pointer; display:grid; place-items:center; }
+  #theme:hover { background:rgba(255,255,255,.14); }
+  #theme svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  :root[data-theme="dark"] #theme .i-sun, :root:not([data-theme="dark"]) #theme .i-moon { display:none; }
   header b { font-size:18px; padding:14px 0; }
   nav { display:flex; gap:4px; flex-wrap:wrap; }
   nav a { color:var(--accent-ink); text-decoration:none; font-size:14px; padding:16px 12px; opacity:.85; border-bottom:3px solid transparent; }
@@ -21,10 +35,11 @@
   h1 { font-size:20px; margin:0 0 16px; }
   h2 { font-size:16px; margin:0 0 10px; }
   li { margin:6px 0; color:var(--muted); }
+  main a:not(.btn) { color:var(--accent); }
   .note { font-size:13px; color:var(--muted); }
   .meta { font-size:12px; color:var(--muted); margin-bottom:6px; }
   .tag { display:inline-block; font-size:11px; background:var(--soft); color:var(--accent); border-radius:6px; padding:2px 6px; margin-left:6px; }
-  a.btn, button.btn { display:inline-block; background:var(--accent); color:#fff; border:none; border-radius:8px; padding:8px 12px;
+  a.btn, button.btn { display:inline-block; background:var(--brand); color:#fff; border:none; border-radius:8px; padding:8px 12px;
            font-size:13px; text-decoration:none; cursor:pointer; margin-top:8px; }
   a.btn.ghost, button.btn.ghost { background:var(--soft); color:var(--accent); }
   table { width:100%; border-collapse:collapse; font-size:14px; }
@@ -35,23 +50,23 @@
   .answer .text { white-space:pre-wrap; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:5; line-clamp:5; overflow:hidden; }
   .answer .more { display:none; background:none; border:none; padding:0; margin-top:4px; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; }
   #full { width:650px; height:500px; max-width:calc(100vw - 32px); max-height:calc(100vh - 32px); padding:0; border:none;
-          border-radius:14px; box-shadow:0 12px 40px rgba(0,0,0,.3); color:var(--ink); }
+          border-radius:14px; box-shadow:0 12px 40px rgba(0,0,0,.3); color:var(--ink); background:var(--card); }
   #full[open] { display:flex; flex-direction:column; }
   #full::backdrop { background:rgba(20,28,45,.45); }
-  #full .bar { background:var(--accent); color:#fff; padding:10px 14px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; font-weight:600; }
+  #full .bar { background:var(--brand); color:#fff; padding:10px 14px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; font-weight:600; }
   #full .bar button { background:none; border:none; color:#fff; font-size:20px; line-height:1; cursor:pointer; }
   #full .body { flex:1; overflow:auto; padding:14px 18px; white-space:pre-wrap; font-size:14px; line-height:1.5; }
-  .ok { color:#1b7f3b; } .bad { color:#b3261e; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
   section[hidden] { display:none; }
   #fab { position:fixed; right:24px; bottom:24px; width:64px; height:64px; border-radius:50%; border:none;
-         background:var(--accent); color:#fff; font-size:28px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.25); }
-  #fab .hint { position:absolute; right:74px; top:16px; white-space:nowrap; background:#fff; color:var(--ink);
+         background:var(--brand); color:#fff; font-size:28px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.25); }
+  #fab .hint { position:absolute; right:74px; top:16px; white-space:nowrap; background:var(--card); color:var(--ink);
                font-size:13px; padding:6px 10px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.15); }
   #panel { position:fixed; right:24px; bottom:100px; width:420px; height:640px; max-height:calc(100vh - 120px);
-           background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,.3); display:none;
+           background:var(--card); border-radius:14px; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,.3); display:none;
            flex-direction:column; z-index:10; }
   #panel.open { display:flex; }
-  #panel .bar { background:var(--accent); color:#fff; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; }
+  #panel .bar { background:var(--brand); color:#fff; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; }
   #panel .bar button { background:none; border:none; color:#fff; font-size:20px; cursor:pointer; }
   #panel iframe { border:0; flex:1; width:100%; }
   @media (max-width: 700px) {
@@ -70,6 +85,10 @@
     <a href="#services" data-tab="services">Сервисы</a>
     <a href="#dou" data-tab="dou">Раздел Департамента ДОУ</a>
   </nav>
+  <button id="theme" type="button">
+    <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+    <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+  </button>
 </header>
 
 <main>
@@ -173,6 +192,29 @@
   document.getElementById('fab').onclick = () => panel.classList.contains('open') ? panel.classList.remove('open') : openChat();
   document.getElementById('close').onclick = () => panel.classList.remove('open');
   document.querySelectorAll('[data-open-chat]').forEach(b => b.onclick = openChat);
+
+  // --- тема: как в системе, кнопка ☀/☾ переключает. Ключ общий с чатом Chainlit (тот же адрес),
+  // поэтому чат в окне виджета меняет тему вместе с порталом, а смена темы в чате меняет портал.
+  const THEME_KEY = 'vite-ui-theme', sysDark = matchMedia('(prefers-color-scheme: dark)');
+  const themeBtn = document.getElementById('theme');
+  let themeMem = null;   // если хранилище браузера недоступно
+  const savedTheme = () => { try { return localStorage.getItem(THEME_KEY); } catch (e) { return themeMem; } };
+  const sysTheme = () => sysDark.matches ? 'dark' : 'light';
+  function applyTheme() {
+    const t = savedTheme(), cur = t === 'light' || t === 'dark' ? t : sysTheme();
+    document.documentElement.dataset.theme = cur;
+    themeBtn.title = cur === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему';
+    themeBtn.setAttribute('aria-label', themeBtn.title);
+  }
+  themeBtn.onclick = () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    themeMem = next === sysTheme() ? 'system' : next;   // вернулись к теме системы — снова следуем за ней
+    try { localStorage.setItem(THEME_KEY, themeMem); } catch (e) { /* тема живёт до перезагрузки */ }
+    applyTheme();
+  };
+  window.addEventListener('storage', e => { if (e.key === THEME_KEY) applyTheme(); });
+  sysDark.addEventListener('change', applyTheme);
+  applyTheme();
 
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const fmtDate = iso => { const [y, m, d] = String(iso).split('-'); return d ? `${d}.${m}.${y}` : iso; };

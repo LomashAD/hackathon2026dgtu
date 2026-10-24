@@ -157,6 +157,13 @@ async def main(url: str) -> int:
         await wpage.wait_for_timeout(4000)
         await wpage.screenshot(path=str(SHOTS / "09_portal_widget.png"))
         check(await wpage.locator("#panel.open").count() == 1, "поп-ап виджет открывается", failures)
+        before = await wpage.evaluate("document.documentElement.dataset.theme")
+        await wpage.click("#theme")
+        await wpage.wait_for_timeout(500)
+        after = await wpage.evaluate("document.documentElement.dataset.theme")
+        chat_dark = await wpage.frame_locator("#frame").locator("html").evaluate("e => e.classList.contains('dark')")
+        check(after != before and chat_dark == (after == "dark"), "кнопка темы меняет тему портала и чата в окне", failures)
+        await wpage.click("#theme")
         await wpage.click("#close")
         for tab, hash_ in [("Новости", "#news"), ("Документы", "#docs"), ("Сервисы", "#services"),
                            ("Раздел Департамента ДОУ", "#dou")]:
