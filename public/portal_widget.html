@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Внутренний портал — макет виджета</title>
 <link rel="icon" href="/public/favicon.svg">
 <link rel="stylesheet" href="/public/fonts/inter.css">
@@ -55,6 +55,68 @@
   header nav a { color:var(--muted); text-decoration:none; font-size:14px; line-height:20px; font-weight:500; padding:6px 12px; border-radius:8px; }
   header nav a:hover { color:var(--ink); background:var(--soft); }
   header nav a.active { color:var(--ink); background:var(--soft); box-shadow:inset 0 0 0 1px var(--line); }
+  /* Имя в шапке: «Имя · Роль ▾» — из частей, чтобы в мобильном меню показать их отдельными строками (loadMe) */
+  #me-name .me-role::before { content:" · "; }
+  #me-name .me-link { display:none; }
+
+  /* --- Мобильная шапка: слева название, справа «бургер»; вкладки, профиль, тема и выход — те же элементы шапки
+     в панели справа. Когда включается — одна CSS-переменная --menu-media (по ней скрипт в <head> ставит
+     класс compact-nav на <html>): ширина до 768 px или телефон в ландшафте (высота до 500 px). */
+  :root { --menu-media: (max-width: 768px), (max-height: 500px); --menu-speed: .22s; }
+  #menu-btn, .menu-overlay { display:none; }
+  #site-menu { display:contents; }   /* на десктопе обёртки нет: вкладки и кнопки — как раньше, прямо в шапке */
+  .compact-nav header { flex-wrap:nowrap; gap:8px; min-height:56px; padding:5px 4px 5px 12px;
+                        margin:calc(8px + env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+                        top:calc(8px + env(safe-area-inset-top)); }
+  .compact-nav header b { flex:1 1 auto; min-width:0; }
+  .compact-nav header b span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  .compact-nav main { padding:0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
+  /* Кнопка меню: область нажатия 44×44, значок 24 px; три полоски плавно складываются в крестик */
+  .compact-nav #menu-btn { display:grid; place-items:center; flex:none; position:relative; z-index:3; width:44px; height:44px;
+                           padding:0; border:none; border-radius:8px; background:none; color:var(--ink); cursor:pointer; }
+  .compact-nav #menu-btn:hover { background:var(--soft); }
+  #menu-btn svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; overflow:visible; }
+  #menu-btn path { transform-box:view-box; transform-origin:12px 12px; transition:transform var(--menu-speed) ease-out, opacity var(--menu-speed) ease-out; }
+  .menu-open #menu-btn .l1 { transform:rotate(45deg) translateY(5px); }
+  .menu-open #menu-btn .l2 { opacity:0; transform:scaleX(.2); }
+  .menu-open #menu-btn .l3 { transform:rotate(-45deg) translateY(-5px); }
+  /* Затемнение и панель — внутри шапки (общий слой); открытое меню поднимает шапку над кнопкой и окном помощника */
+  .menu-open header { z-index:40; }
+  .compact-nav .menu-overlay { display:block; position:fixed; inset:0; z-index:1; background:rgba(0,0,0,.55); opacity:0;
+                               visibility:hidden; transition:opacity var(--menu-speed) ease-out, visibility 0s var(--menu-speed); }
+  .menu-open .menu-overlay { opacity:1; visibility:visible; transition:opacity var(--menu-speed) ease-out, visibility 0s; }
+  .compact-nav #site-menu { display:flex; flex-direction:column; position:fixed; top:0; right:0; bottom:0; z-index:2;
+                            width:min(84vw, 340px); height:100vh; height:100dvh; overflow-y:auto; overscroll-behavior:contain;
+                            padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(8px + env(safe-area-inset-bottom)) 0;
+                            background:var(--bg); border:1px solid var(--line); border-right:none; border-radius:14px 0 0 14px;
+                            box-shadow:rgba(0,0,0,.35) -8px 0 24px 0; font-size:16px; line-height:24px;
+                            transform:translateX(100%); opacity:0; visibility:hidden;
+                            transition:transform var(--menu-speed) ease-out, opacity var(--menu-speed) ease-out, visibility 0s var(--menu-speed); }
+  .menu-open #site-menu { transform:none; opacity:1; visibility:visible;
+                          transition:transform var(--menu-speed) ease-out, opacity var(--menu-speed) ease-out, visibility 0s; }
+  .menu-open, .menu-open body { overflow:hidden; }   /* страница под меню не прокручивается */
+  /* Содержимое панели сверху вниз: пользователь → вкладки → разделитель → тема и выход внизу */
+  .compact-nav .tools { display:contents; }
+  .compact-nav #me-name { order:-1; flex:none; display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%;
+                          max-width:none; min-height:76px; padding:20px 64px 16px 20px; border-radius:0; border-bottom:1px solid var(--line);
+                          white-space:normal; text-align:left; color:var(--ink); font-size:16px; line-height:24px; font-weight:600; }
+  .compact-nav #me-name:hover { background:var(--soft); }
+  .compact-nav #me-name .me-role { font-size:14px; line-height:20px; font-weight:400; color:var(--muted); }
+  .compact-nav #me-name .me-role::before { content:none; }
+  .compact-nav #me-name .me-caret { display:none; }
+  .compact-nav #me-name .me-link { display:block; margin-top:4px; font-size:14px; line-height:20px; font-weight:500; color:var(--accent); }
+  .compact-nav header nav { order:0; flex:none; flex-direction:column; flex-wrap:nowrap; gap:0; padding:8px 0; }
+  .compact-nav header nav a { display:flex; align-items:center; min-height:50px; padding:0 20px; border-radius:0;
+                              font-size:16px; line-height:24px; color:var(--ink); }
+  .compact-nav header nav a.active { color:var(--accent); background:var(--soft); box-shadow:inset 3px 0 0 var(--accent); }
+  .compact-nav #theme, .compact-nav #logout { width:100%; height:auto; min-height:50px; display:flex; align-items:center; gap:12px;
+                                              justify-content:flex-start; padding:0 20px; border:none; border-radius:0; background:none;
+                                              color:var(--ink); font:inherit; font-size:16px; line-height:24px; font-weight:500; text-align:left; }
+  .compact-nav #theme { order:2; margin-top:auto; border-top:1px solid var(--line); }   /* разделитель перед действиями */
+  .compact-nav #theme::after { content:attr(title); }   /* подпись — та же, что в подсказке кнопки (applyTheme) */
+  .compact-nav #logout { order:3; }
+  .compact-nav #theme:hover, .compact-nav #logout:hover { background:var(--soft); }
+  @media (prefers-reduced-motion: reduce) { #site-menu, .menu-overlay, #menu-btn path { transition:none !important; } }
   main { max-width:1152px; margin:32px auto 128px; padding:0 16px; }
   /* «Новости» и «Сервисы» — сетка карточек: страница чуть шире, колонки ~314 px вместо ~274 px (4 в ряд остаются) */
   main:has(> #tab-news:not([hidden])), main:has(> #tab-services:not([hidden])) { max-width:1312px; }
@@ -196,22 +258,31 @@
   #panel .grip svg { position:absolute; left:4px; top:4px; width:10px; height:10px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; }
   #panel.resizing iframe { pointer-events:none; }   /* иначе iframe перехватит мышь, пока тянут */
   @media (max-width: 700px) {
-    header { margin:8px 8px 0; padding:8px; }
+    /* шапка на узком экране — .compact-nav выше (меню «бургер») */
     h1 { font-size:24px; line-height:1.17; font-weight:600; letter-spacing:0; }
-    .grid { grid-template-columns:1fr; } header nav a { padding:6px 8px; }
-    header { row-gap:4px; } header nav { order:3; flex-basis:100%; } #me-name { max-width:170px; }
+    .grid { grid-template-columns:1fr; }
     .form-grid { grid-template-columns:1fr; }
-    #panel { right:8px; left:8px; width:auto; height:640px; max-width:none; bottom:88px; max-height:calc(100vh - 120px); }
+    #panel { right:8px; left:8px; width:auto; height:640px; max-width:none; bottom:calc(88px + env(safe-area-inset-bottom));
+             max-height:calc(100vh - 120px - env(safe-area-inset-bottom)); }
     #panel .rs { display:none; } #fab .hint { display:none; }
-    #fab { right:16px; bottom:16px; }
+    #fab { right:max(16px, env(safe-area-inset-right)); bottom:calc(16px + env(safe-area-inset-bottom)); }
     #tab-docs th:nth-child(3), #tab-docs td:nth-child(3) { display:none; }
   }
 </style>
+<script>
+  // Мобильная шапка: класс compact-nav на <html> по медиа-строке из CSS-переменной --menu-media — до первой отрисовки,
+  // и меняется сразу при повороте экрана или изменении окна. Тот же MediaQueryList использует меню (window.__menuMQ).
+  (() => { const q = getComputedStyle(document.documentElement).getPropertyValue('--menu-media').trim() || '(max-width: 768px)';
+    const mq = window.__menuMQ = matchMedia(q), set = () => document.documentElement.classList.toggle('compact-nav', mq.matches);
+    set(); mq.addEventListener('change', set); })();
+</script>
 </head>
 <body>
 <header>
-  <b>Внутренний портал Организации</b>
-  <nav>
+  <b><span>Внутренний портал Организации</span></b>
+  <!-- На десктопе обёртка #site-menu не видна (display: contents); на телефоне это выезжающая панель с теми же элементами -->
+  <div id="site-menu">
+  <nav aria-label="Разделы портала">
     <a href="#news" data-tab="news">Новости</a>
     <a href="#docs" data-tab="docs">Документы</a>
     <a href="#services" data-tab="services">Сервисы</a>
@@ -225,6 +296,11 @@
     <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
   </button>
   </div>
+  </div>
+  <div class="menu-overlay" aria-hidden="true"></div>
+  <button id="menu-btn" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="site-menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path class="l1" d="M4 7h16"/><path class="l2" d="M4 12h16"/><path class="l3" d="M4 17h16"/></svg>
+  </button>
 </header>
 
 <main>
@@ -652,13 +728,56 @@
   async function loadMe() {
     me = await getJSON('/api/me');
     const el = document.getElementById('me-name');
-    el.textContent = (me.name.includes(me.role_title) ? me.name : `${me.name} · ${me.role_title}`) + ' ▾';
+    // На десктопе — «Имя · Роль ▾» одной строкой, в мобильном меню — имя, роль и «Мой профиль» отдельными строками
+    el.innerHTML = `<span class="me-n">${esc(me.name)}</span>`
+      + (me.name.includes(me.role_title) ? '' : `<span class="me-role">${esc(me.role_title)}</span>`)
+      + '<span class="me-caret" aria-hidden="true"> ▾</span><span class="me-link">Мой профиль</span>';
     el.title = `${me.login} · ${me.role_title} — профиль и смена пароля`;
     document.getElementById('nav-admin').hidden = !me.can_manage_users;
   }
   document.getElementById('logout').onclick = async () => {
     try { await fetch('/logout', {method: 'POST'}); } finally { location.replace('/login'); }
   };
+
+  // --- мобильное меню: те же вкладки, профиль, тема и выход в панели справа (класс compact-nav ставит <head>)
+  const root = document.documentElement, menuBtn = document.getElementById('menu-btn'),
+        siteMenu = document.getElementById('site-menu'), menuMQ = window.__menuMQ;
+  const menuOpen = () => root.classList.contains('menu-open');
+  // Порядок фокуса — как на экране: крестик, профиль, вкладки (видимые), тема, выход
+  const menuItems = () => [menuBtn, document.getElementById('me-name'), ...siteMenu.querySelectorAll('nav a:not([hidden])'),
+                           document.getElementById('theme'), document.getElementById('logout')];
+  function setMenu(open, returnFocus = true) {
+    if (open && !root.classList.contains('compact-nav')) return;
+    root.classList.toggle('menu-open', open);
+    menuBtn.setAttribute('aria-expanded', String(open));
+    menuBtn.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
+    if (open) menuItems()[1].focus();
+    else if (returnFocus && root.classList.contains('compact-nav')) menuBtn.focus();
+  }
+  function syncMenuMode() {   // панель — диалог только на телефоне; на десктопе обёртка невидима
+    const compact = root.classList.contains('compact-nav');
+    for (const [k, v] of [['role', 'dialog'], ['aria-modal', 'true'], ['aria-label', 'Меню портала']]) {
+      if (compact) siteMenu.setAttribute(k, v); else siteMenu.removeAttribute(k);
+    }
+    if (!compact) setMenu(false, false);
+  }
+  menuBtn.onclick = () => setMenu(!menuOpen());
+  document.querySelector('.menu-overlay').onclick = () => setMenu(false);
+  siteMenu.addEventListener('click', e => {   // выбор пункта закрывает меню; смена темы — нет, чтобы видеть результат
+    if (!menuOpen()) return;
+    if (e.target.closest('nav a')) setMenu(false);
+    else if (e.target.closest('#me-name, #logout')) setMenu(false, false);   // фокус уходит в окно профиля
+  });
+  document.addEventListener('keydown', e => {
+    if (!menuOpen()) return;
+    if (e.key === 'Escape') { e.preventDefault(); setMenu(false); return; }
+    if (e.key !== 'Tab') return;
+    const items = menuItems(), i = items.indexOf(document.activeElement);   // фокус не выходит из панели
+    e.preventDefault();
+    items[(i + (e.shiftKey ? -1 : 1) + items.length) % items.length].focus();
+  });
+  menuMQ.addEventListener('change', syncMenuMode);   // поворот экрана или окно шире — меню закрывается
+  syncMenuMode();
 
   let roleList = [];
   async function loadUsers() {

@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Вход — Внутренний портал</title>
 <link rel="icon" href="/public/favicon.svg">
 <link rel="stylesheet" href="/public/fonts/inter.css">
@@ -29,6 +29,8 @@
            border:1px solid var(--line); border-radius:10px; background:var(--bg); box-shadow:rgba(0,0,0,.25) 0px 4px 4px 0px;
            font-size:14px; line-height:20px; font-weight:600; }
   header::before { content:""; width:24px; height:24px; flex:none; background:url("/public/favicon.svg") center / contain no-repeat; }
+  /* Навигации на странице входа нет — меню не нужно; длинное название обрезается многоточием до кнопки темы */
+  header .title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #theme { position:absolute; right:8px; top:50%; transform:translateY(-50%); width:32px; height:32px; border-radius:8px; border:none;
            background:none; color:var(--muted); cursor:pointer; display:grid; place-items:center; }
   #theme:hover { color:var(--ink); background:var(--soft); }
@@ -48,11 +50,15 @@
   button[type=submit]:hover { opacity:.9; }
   button[type=submit]:disabled { opacity:.5; cursor:default; }
   #error { color:var(--bad); font-size:14px; line-height:20px; margin-top:12px; min-height:1em; }
-  @media (max-width: 640px) { header { margin:8px 8px 0; } form { padding:24px 16px 16px; } }
+  @media (max-width: 640px) {
+    header { margin:calc(8px + env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); }
+    main { padding-bottom:calc(24px + env(safe-area-inset-bottom)); }
+    form { padding:24px 16px 16px; }
+  }
 </style>
 </head>
 <body>
-<header>Внутренний портал Организации
+<header><span class="title">Внутренний портал Организации</span>
   <button id="theme" type="button">
     <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true"></svg>
   </button>
