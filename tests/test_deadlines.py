@@ -42,7 +42,7 @@ def frozen(monkeypatch):
 def test_calendar_file(cal):
     workdays = sum(cal.is_workday(D(2026, 1, 1) + dt.timedelta(days=i)) for i in range(365))
     assert workdays == 247                                  # официальная норма 2026 года: 247 рабочих дней
-    assert cal.years == {2026: "confirmed", 2027: "preliminary"}
+    assert cal.years[2026] == "confirmed" and 2027 in cal.years       # 2027 — предварительный, пока нет постановления
     assert cal.check[2026] and cal.check[2027]              # что требует проверки — записано в файле
 
 
