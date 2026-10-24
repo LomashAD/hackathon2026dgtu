@@ -8,7 +8,8 @@ from app.approval import deadlines
 
 log = logging.getLogger(__name__)
 
-INTENTS = ["question", "find_section", "create_doc", "check_doc", "approval", "deadline", "contact", "help"]
+INTENTS = ["question", "find_section", "create_doc", "check_doc", "approval", "deadline", "deadline_calc", "contact",
+           "help"]
 
 QUESTION_START = re.compile(r"^\s*((а|и|ну|так|тогда)\s+)?(как|что|какой|какая|какие|каков|какую|каком|какого|когда|где|"
                             r"куда|откуда|можно ли|нужно ли|надо ли|обязательно ли|должен ли|есть ли|вправе ли|"
@@ -44,8 +45,28 @@ LLM_EVIDENCE = {
     "approval": re.compile(r"(согласов|визир|\bвиз[аыуе]\b)", re.I),
     "contact": re.compile(r"(обратит|консульт|разъясн|контакт|позвон)", re.I),
 }
+# Расчёт срока в датах: «когда будет готово», «к какому числу», «когда истекает», «крайний срок» — или дата отправки
+# с вопросом «когда». Без даты и без этих слов вопрос о сроке остаётся вопросом о сроке в днях (намерение deadline):
+# «через сколько дней после подписания регистрируют исходящий?», «дедлайн выпал на субботу — когда сдавать?».
+DEADLINE_CALC = re.compile(r"когда (\w+ ){0,2}будет готов|к какому (числу|дню|сроку)|до какого (числа|дня)|"
+                           r"какого числа (\w+ ){0,2}(будет|соглас|рассмотр|истека|истеч|готов|подпиш|исполн)|"
+                           r"крайн\w* (срок|дат|день)|когда (\w+ ){0,3}(истека|истеч|заканчива|закончится|кончается)|"
+                           r"срок\w* (\w+ ){0,3}(истека|истеч)|через сколько (рабочих )?дн", re.I)
+SEND_VERB = re.compile(r"\b(отправ|направ|подал|подам|подаю|подать|переда|поступ|пришл|пришел|пришёл|зарегистрир|"
+                       r"сдал|сдам|отдал|отдам|получил)\w*", re.I)
+WHEN = re.compile(r"\bкогда\b|\bсколько\b|к какому|какого числа", re.I)
 HELP = re.compile(r"^\s*(привет|здравствуй\w*|добрый (день|вечер|утро)|помощь|help|/help|/start|что ты умеешь|"
                   r"что умеешь|начать|меню)\b", re.I)
+
+
+def wants_dates(text: str) -> bool:
+    """Нужна конкретная дата, а не срок в днях: ключевые слова расчёта или дата отправки с вопросом «когда»."""
+    send = SEND_VERB.search(text)
+    dated = send is not None and deadlines.parse_date_from_text(text, deadlines.today()) is not None
+    if DEADLINE_CALC.search(text):
+        # «через сколько дней после подписания регистрируют» — вопрос о сроке в днях, дата не нужна
+        return dated or not re.search(r"через сколько (рабочих )?дн", text, re.I)
+    return dated and bool(WHEN.search(text))
 
 
 def classify(text: str, has_file: bool = False, llm=None) -> tuple[str, str]:
@@ -57,6 +78,8 @@ def classify(text: str, has_file: bool = False, llm=None) -> tuple[str, str]:
         return "help", "rule"
     if CHECK.search(t):
         return "check_doc", "rule"
+    if wants_dates(t):
+        return "deadline_calc", "rule"
     if APPROVAL.search(t):
         return "approval", "rule"
     if CONTACT.search(t):

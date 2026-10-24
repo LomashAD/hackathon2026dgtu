@@ -464,3 +464,15 @@ def build_schedule(start: dt.date, steps: list[Step], cal: Calendar, shift: str 
         if st.after != "later":
             cursor = due
     return rows
+
+
+# Пункты Инструкции, из которых калькулятор берёт сроки и порядок (doc_id — как в TABLES)
+POINTS = {"order": "10.2", "visa": "10.6", "signing": "10.15", "linguistic": "10.13", "count": "6.4", "urgent": "6.7"}
+WEEKDAY_NAMES = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
+
+
+def days_word(n: int, unit: str = "work") -> str:
+    """3 рабочих дня, 1 рабочий день, 30 календарных дней."""
+    adj = ("рабочий", "рабочих", "рабочих") if unit == "work" else ("календарный", "календарных", "календарных")
+    i = 0 if n % 10 == 1 and n % 100 != 11 else 1 if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else 2
+    return f"{n} {adj[i]} {('день', 'дня', 'дней')[i]}"

@@ -208,6 +208,13 @@ class Engine:
                          intent="check_doc")
         if intent == "approval":
             return self.approval(s, q)
+        if intent == "deadline_calc":
+            # «а если приказ, к какому числу?» сразу после расчёта — к тем же дате и этапу
+            last = s.history[-1]["intent"] if s.history else ""
+            base = s.params.get("calc") if last == "deadline_calc" and FOLLOWUP_RE.match(q) else None
+            r = self.deadline_calc(s, q, base=base, raw=n.original)
+            if r is not None:
+                return r
         if intent == "deadline":
             r = self.deadline(s, q)
             if r is not None:
@@ -236,9 +243,11 @@ class Engine:
         "rude": "Извините, что ответ не помог. Попробуйте сказать иначе: какой документ и что с ним нужно сделать. "
                 "Если вопрос сложный, проконсультируйтесь в Департаменте ДОУ (п. 2.1 Инструкции).",
     }
+    # Первые три — карточки приветствия (app/main.py, сетка в 3 колонки); четвёртый — только кнопкой
     EXAMPLES = [("Когда регистрировать входящий?", "Когда нужно зарегистрировать входящий документ?"),
                 ("Кто визирует приказ о выходных?", "Кто визирует приказ о работе в выходные дни?"),
-                ("Подготовить распоряжение", "Нужно подготовить распоряжение о создании рабочей группы")]
+                ("Подготовить распоряжение", "Нужно подготовить распоряжение о создании рабочей группы"),
+                ("Когда согласуют распоряжение?", "Если отправлю распоряжение на согласование сегодня, когда будет готово?")]
 
     def small_talk(self, s: Session, n: normalize.Normalized) -> Reply:
         """Ответ на реплику без вопроса — без поиска и без отказа «недостаточно информации»."""
@@ -318,6 +327,8 @@ class Engine:
                 return self.approval(s, text)
         if s.last_intent == "deadline" and s.params.get("deadline_kind"):
             return self.deadline(s, text, forced_kind=s.params["deadline_kind"], followup=True)
+        if s.last_intent == "deadline_calc" and s.params.get("calc"):
+            return self.deadline_calc(s, text, base=s.params["calc"], followup=True)
         return None
 
     # ================================================================ уточнения
@@ -342,6 +353,12 @@ class Engine:
             return self.approval_answer(s, row, pend["query"])
         if kind == "deadline_item":
             return self.deadline(s, pend["query"] + " " + text, forced_kind=pend["kind"], strict=True)
+        if kind == "deadline_calc":
+            c = pend["calc"]
+            if re.match(r"\s*только срок", text, re.I):   # кнопка «Только срок в днях» — ответ без дат, как раньше
+                return self.deadline(s, f"срок {c['query']} {c.get('doc') or c.get('sender') or ''}",
+                                     forced_kind="execution" if c.get("stage") == "execution" else "review", strict=True)
+            return self.deadline_calc(s, text, base=c, followup=True)
         if kind == "template":
             tid = text.strip() if text.strip() in load_templates() else pick_template(text)[0]
             if not tid:
@@ -631,6 +648,331 @@ class Engine:
                          f"в течение {term} с даты его регистрации.")
         return Reply(body, sources=sources, intent="deadline")
 
+    # ================================================================ сроки в датах (калькулятор)
+    # Срок в днях — из текста пунктов (п. 10.3, 10.15, 6.6, 6.7), одновременно или по очереди — из п. 10.2 и 10.6,
+    # кто — из Матрицы, даты — по производственному календарю (deadlines.get_calendar). Модель не участвует.
+    CALC_GEN = {"approval": "согласования", "review": "рассмотрения", "execution": "исполнения",
+                "signing": "подписания", "visa": "визирования", "linguistic": "лингвистической экспертизы"}
+
+    def deadline_calc(self, s: Session, text: str, base: dict | None = None, followup: bool = False,
+                      raw: str = "") -> Reply | None:
+        """«Когда будет готово, если отправлю сегодня?» — дата отправки + срок из Инструкции по календарю.
+        base — уже известное (ответ на уточняющий вопрос, «а если приказ?»); followup — без новых сведений
+        в реплике возвращает None, и реплика обрабатывается как обычно."""
+        today = deadlines.today()
+        got = self._calc_read(s, text, raw, today)
+        if followup and not got:
+            return None
+        calc = {**(base or {}), **got}
+        calc.setdefault("query", text)
+        stage = calc.setdefault("stage", "approval")
+        s.params["calc"] = calc
+        s.last_query, s.last_intent, s.last_hits, s.last_simple = calc["query"], "deadline_calc", [], ""
+        if stage in ("visa", "linguistic", "signing"):
+            sec = self.retriever.get_section("instr_dou", deadlines.POINTS[stage], s.role)
+            term = deadlines.find_term(sec.text) if sec else None
+            if not term:
+                return self._calc_no_term(s, text, calc, sec)
+        else:
+            doc_id, section, _ = deadlines.TABLES["execution" if stage == "execution" else "review"]
+            if not self.retriever.get_section(doc_id, section, s.role):
+                return None
+        need_doc = (stage in ("approval", "review") and not calc.get("doc")) or \
+                   (stage == "execution" and not calc.get("sender") and not calc.get("urgency"))
+        if need_doc or not calc.get("date"):
+            return self._calc_ask(s, calc, need_doc, not calc.get("date"), today)
+        return self._calc_answer(s, calc, today)
+
+    def _calc_read(self, s: Session, text: str, raw: str, today: dt.date) -> dict:
+        """Что есть в реплике: этап, дата отправки, вид документа (п. 10.3), от кого поступил (п. 6.6), срочность."""
+        got = {}
+        if st := deadlines.detect_stage(text):
+            got["stage"] = st
+        ref = deadlines.parse_date_from_text(text, today) or (deadlines.parse_date_from_text(raw, today) if raw else None)
+        if ref:
+            got["date"], got["date_phrase"] = ref.date.isoformat(), ref.phrase
+        rev = self.retriever.get_section(*deadlines.TABLES["review"][:2], s.role)
+        if rev and (d := deadlines.match_doc(deadlines.parse_items(rev.text), text)):
+            got["doc"], got["doc_text"] = d[0], text
+        ex = self.retriever.get_section(*deadlines.TABLES["execution"][:2], s.role)
+        if ex and (d := deadlines.match_sender(deadlines.parse_items(ex.text), text)):
+            got["sender"] = d[0]
+        if re.search(r"весьма срочн", text, re.I):
+            got["urgency"] = "very"
+        elif re.search(r"\bсрочн", text, re.I):
+            got["urgency"] = "urgent"
+        return got
+
+    def _calc_ask(self, s: Session, calc: dict, need_doc: bool, need_date: bool, today: dt.date) -> Reply:
+        """Один уточняющий вопрос с кнопками: вид документа и/или дата отправки — угадывать нельзя."""
+        if need_doc:
+            execution = calc["stage"] == "execution"
+            sec = self.retriever.get_section(*deadlines.TABLES["execution" if execution else "review"][:2], s.role)
+            names = [n for n, _ in deadlines.parse_items(sec.text)]
+            if not execution:
+                names = names[:6] + [n for n in names if n.startswith("иной")]
+            what = "от кого поступил документ (или его вид)" if execution else "какой документ"
+            q = f"Срок зависит от вида документа. Уточните, пожалуйста, **{what}**"
+            if need_date:
+                q += (f" и **когда его отправили**. Кнопки посчитают от сегодняшнего дня ({deadlines.fmt_day(today)}), "
+                      "другую дату напишите сами — например: «приказ, 12 ноября».")
+            else:
+                q += ":"
+            suffix = ", сегодня" if need_date else ""
+            opts = [((n[:1].upper() + n[1:])[:60], n + suffix) for n in names]
+        else:
+            q = ("Уточните, пожалуйста, **когда документ отправлен** (или будет отправлен) — от этой даты считаю срок. "
+                 "Можно написать дату: «12 ноября», «15.11», «во вторник».")
+            mon = today + dt.timedelta(days=7 - today.weekday())
+            opts = [(f"Сегодня ({deadlines.fmt_day(today)})", "сегодня"),
+                    (f"Завтра ({deadlines.fmt_day(today + deadlines.DAY)})", "завтра"),
+                    (f"В понедельник ({deadlines.fmt_day(mon)})", f"{mon:%d.%m.%Y}")]
+            if calc["stage"] in ("approval", "review", "execution"):
+                opts.append(("Только срок в днях", "только срок"))
+        return self._ask(s, q, opts, {"type": "deadline_calc", "calc": calc}, "deadline_calc")
+
+    def _calc_no_term(self, s: Session, text: str, calc: dict, sec: Hit | None) -> Reply:
+        """Срока для этапа в Инструкции нет — честный отказ и куда обратиться, как в обычных отказах."""
+        stage = calc["stage"]
+        why = {"visa": "Инструкция устанавливает только порядок визирования — строго по очереди (п. 10.6), "
+                       "а срок одной визы не указывает.",
+               "linguistic": "Пункт 10.13 перечисляет, какие документы проходят лингвистическую экспертизу, "
+                             "но срок экспертизы не указывает.",
+               "signing": "Пункт 10.15 о подписании срока не указывает."}.get(stage, "")
+        c = self._contact_for(text)
+        msg = (f"**Срок {self.CALC_GEN[stage]} в базе знаний не указан** — посчитать дату не могу, гадать не буду. "
+               f"{why} Срок в рабочих днях Инструкция устанавливает для рассмотрения проекта (п. 10.3).\n\n"
+               f"**Куда обратиться:** {c['unit']} ({c['basis']}).")
+        src = [Source(citation(sec.meta), None, sec.text, sec.meta["doc_id"], sec.section)] if sec else []
+        hit = self.retriever.get_section(c["ref"]["doc_id"], c["ref"]["section"], s.role)
+        if hit:
+            src.append(Source(citation(hit.meta), None, hit.text, hit.meta["doc_id"], hit.section, kind="contact"))
+        actions = []
+        if calc.get("date"):
+            doc = f" ({calc['doc']})" if calc.get("doc") else ""
+            actions = [("Посчитать срок рассмотрения", f"Когда истекает срок рассмотрения{doc}, если отправить "
+                                                       f"{dt.date.fromisoformat(calc['date']):%d.%m.%Y}?")]
+        audit.log_unanswered(s.role, text, 0.0)
+        return Reply(msg, sources=src, actions=actions, intent="deadline_calc", refused=True, meta={"best": 0.0})
+
+    def _calc_who(self, calc: dict) -> tuple[list[str], list[tuple[str, str]], str | None, str | None]:
+        """Подразделения обязательного визирования по Матрице для вида документа (строка — по теме, иначе «прочие»).
+        Возвращает также вид документа по Матрице: для письма без адресата строка не выбирается."""
+        m = get_matrix()
+        txt = f"{calc.get('doc_text', '')} {calc.get('doc', '')}"
+        kind = m.detect_kind(txt)
+        row = (m.detect_row(txt, kind) or DEFAULT_ROW_FOR(kind)) if kind and m.rows else None
+        if not row or row not in m.rows:
+            return [], [], None, kind
+        a = m.lookup(row)
+        return a.required, a.conditional, row, kind
+
+    def _calc_steps(self, s: Session, calc: dict) -> tuple[list[list[deadlines.Step]], list[deadlines.Step], dict]:
+        """Этапы с датами (один вариант или два — одновременно / по очереди) и этапы после них без дат."""
+        stage, info = calc["stage"], {"points": [], "row": None, "cond": []}
+        pts = info["points"]
+        if stage in ("signing", "visa", "linguistic"):
+            n, unit, rule = deadlines.find_term(self.retriever.get_section(
+                "instr_dou", deadlines.POINTS[stage], s.role).text)
+            pts.append(deadlines.POINTS[stage])
+            who = {"signing": "подписант", "visa": "визирующие по очереди (п. 10.6)",
+                   "linguistic": "Департамент ДОУ"}[stage]
+            title = {"signing": "Подписание", "visa": "Визирование", "linguistic": "Лингвистическая экспертиза"}[stage]
+            basis = f"п. {deadlines.POINTS[stage]}" + (", как правило" if rule else "")
+            return [[deadlines.Step(title, who, n, unit, basis, after="start")]], [], info
+        if stage == "execution":
+            if calc.get("urgency"):
+                u = self.retriever.get_section("instr_dou", deadlines.POINTS["urgent"], s.role)
+                term = deadlines.urgent_term(u.text, calc["urgency"] == "very") if u else None
+                title = "Исполнение — отметка «" + ("Весьма срочно" if calc["urgency"] == "very" else "Срочно") + "»"
+                basis = f"п. {deadlines.POINTS['urgent']}"
+            else:
+                ex = self.retriever.get_section(*deadlines.TABLES["execution"][:2], s.role)
+                item = next(((n, t) for n, t in deadlines.parse_items(ex.text) if n == calc["sender"]), None)
+                term = deadlines.parse_term(item[1]) if item else None
+                title, basis = f"Исполнение — {calc['sender']}", f"п. {deadlines.TABLES['execution'][1]}"
+            if not term:
+                return [], [], info
+            pts += [basis.removeprefix("п. "), deadlines.POINTS["count"]]
+            return [[deadlines.Step(title, "исполнитель", term[0], term[1], basis, after="start")]], [], info
+        # согласование и рассмотрение (п. 10.2, 10.3)
+        rev = self.retriever.get_section(*deadlines.TABLES["review"][:2], s.role)
+        item = next(((n, t) for n, t in deadlines.parse_items(rev.text) if n == calc["doc"]), None)
+        term = deadlines.parse_term(item[1]) if item else None
+        if not term:
+            return [], [], info
+        n, unit = term
+        req, cond, row, mkind = self._calc_who(calc)
+        info["row"], info["cond"] = row, cond
+        order = self.retriever.get_section("instr_dou", deadlines.POINTS["order"], s.role)
+        mode = deadlines.review_mode(order.text) if order else "unknown"
+        info["mode"] = mode
+        pts += [deadlines.POINTS["order"], deadlines.TABLES["review"][1]] if order else [deadlines.TABLES["review"][1]]
+        who = "; ".join(filter(None, [
+            ", ".join(req) + " — обязательно по Матрице" if req else "",
+            "при условии — " + ", ".join(u for u, _ in cond) if cond else "",
+            "обязательные по Матрице — зависят от адресата письма" if mkind == "letter" and not row else "",
+            "другие заинтересованные подразделения (определяет исполнитель)"]))
+        basis = f"п. {deadlines.TABLES['review'][1]}"
+        together = [deadlines.Step("Первичное рассмотрение — одновременно во всех подразделениях", who, n, unit, basis,
+                                   after="start")]
+        chain = [deadlines.Step(f"Первичное рассмотрение по очереди: {u}", u, n, unit, basis,
+                                after="start" if i == 0 else "prev") for i, u in enumerate(req)]
+        variants = {"parallel": [together], "sequential": [chain or together]}.get(mode, [together, chain] if chain
+                                                                                  else [together])
+        later = [deadlines.Step("Повторное рассмотрение — если были замечания", "те же подразделения", n, unit, basis,
+                                after="later", note=f"{deadlines.days_word(n, unit)} со дня направления новой редакции")]
+        if stage == "approval":
+            visa = self.retriever.get_section("instr_dou", deadlines.POINTS["visa"], s.role)
+            sign = self.retriever.get_section("instr_dou", deadlines.POINTS["signing"], s.role)
+            if visa:
+                vt = deadlines.find_term(visa.text)
+                steps = re.findall(r"^\d+\)\s*(.+?)[;.]?$", visa.text, re.M)
+                vwho = f"по порядку п. {deadlines.POINTS['visa']}" + (f": {steps[0]} … {steps[-1]}" if steps else "")
+                later.append(deadlines.Step("Визирование — строго по очереди", vwho, vt[0] if vt else None,
+                                            vt[1] if vt else "work", f"п. {deadlines.POINTS['visa']}", after="later",
+                                            note="—" if not vt else f"{deadlines.days_word(vt[0], vt[1])} на каждую визу"))
+                pts.append(deadlines.POINTS["visa"])
+            if sign and (st := deadlines.find_term(sign.text)):
+                later.append(deadlines.Step("Подписание", "подписант", st[0], st[1],
+                                            f"п. {deadlines.POINTS['signing']}" + (", как правило" if st[2] else ""),
+                                            after="later",
+                                            note=f"{deadlines.days_word(st[0], st[1])} со дня направления подписанту"))
+                pts.append(deadlines.POINTS["signing"])
+        return variants, later, info
+
+    def _calc_answer(self, s: Session, calc: dict, today: dt.date) -> Reply:
+        cal = deadlines.get_calendar()
+        start = dt.date.fromisoformat(calc["date"])
+        variants, later, info = self._calc_steps(s, calc)
+        if not variants:
+            sec = self.retriever.get_section(*deadlines.TABLES["execution" if calc["stage"] == "execution"
+                                                                else "review"][:2], s.role)
+            return self._calc_no_term(s, calc["query"], calc, sec)
+        count = self.retriever.get_section("instr_dou", deadlines.POINTS["count"], s.role)
+        shift = deadlines.end_shift(count.text) if count else "prev"
+        scheds = [deadlines.build_schedule(start, v, cal, shift) for v in variants]
+        dues = [rows[-1].due for rows in scheds]
+        first = variants[0][0]
+        stage = calc["stage"]
+        what = {"execution": "исполнить документ", "signing": "подписать документ", "visa": "завизировать проект",
+                "linguistic": "провести экспертизу"}.get(stage, "")
+        # Итог
+        point, _, rule = first.basis.partition(", ")
+        term_ref = f"{deadlines.days_word(first.days, first.unit)} ({point} Инструкции{', ' + rule if rule else ''})"
+        order = f"п. {deadlines.POINTS['order']}"
+        if stage in ("approval", "review"):
+            doc = f"проект вида «{calc['doc']}», отправленный {deadlines.fmt_day(start)}"
+            if len(dues) == 2:
+                head = (f"**Итог: рассмотрение завершится не позднее {deadlines.fmt_day(dues[0])}, если подразделения "
+                        f"рассматривают проект одновременно, или {deadlines.fmt_day(dues[1])} — если по очереди.** "
+                        f"В Инструкции не сказано, одновременно или по очереди рассматривают {doc}, — поэтому показаны "
+                        f"оба варианта. Срок каждого рассмотрения — {term_ref}.")
+            else:
+                how = {"sequential": f"Рассматривают по очереди ({order}), у каждого подразделения — {term_ref}.",
+                       "parallel": f"Рассматривают одновременно ({order}), срок — {term_ref}."}.get(
+                    info.get("mode"), f"Срок — {term_ref}.")
+                head = (f"**Итог: рассмотрение завершится не позднее {deadlines.fmt_day(dues[0])}** — к этой дате "
+                        f"подразделения должны рассмотреть {doc}. {how}")
+        else:
+            reg = "зарегистрирован" if stage == "execution" else "направлен подписанту" if stage == "signing" \
+                else "направлен"
+            head = (f"**Итог: {what} не позднее {deadlines.fmt_day(dues[0])}.** Документ {reg} "
+                    f"{deadlines.fmt_day(start)}, срок — {term_ref}.")
+        # Таблица этапов
+        rows = [r for rows in scheds for r in rows] + [deadlines.Row(st, None, None) for st in later]
+        work_only = all(r.step.unit == "work" or r.step.days is None for r in rows)
+        table = ["| Этап | Кто | " + ("Срок, раб. дн." if work_only else "Срок") + " | Крайняя дата |", "|---|---|---|---|"]
+        for i, r in enumerate(rows, 1):
+            st = r.step
+            if st.days is None:
+                term = "в Инструкции не указан"
+            else:
+                term = (str(st.days) if work_only else deadlines.days_word(st.days, st.unit)) + f" ({st.basis})"
+            due = f"**{deadlines.fmt_day(r.due)}**" if r.due else (st.note or "—")
+            table.append(f"| {i}. {st.title} | {st.who} | {term} | {due} |")
+        # Как считал и предупреждения
+        notes = []
+        if stage == "execution":
+            notes.append("_Как считал: срок — с даты регистрации документа (п. 6.4)"
+                         + ("; последний день срока, выпавший на выходной или праздник, переносится на предшествующий "
+                            "рабочий день (п. 6.4)._" if first.unit == "calendar" else
+                            "; выходные и нерабочие праздничные дни не считаются._"))
+            raw_end = start + dt.timedelta(days=first.days)
+            if first.unit == "calendar" and raw_end != dues[0]:
+                notes.append(f"_{deadlines.days_word(first.days, 'calendar')} истекают {deadlines.fmt_day(raw_end)} — "
+                             f"это нерабочий день, поэтому срок — {deadlines.fmt_day(dues[0])}._")
+        else:
+            notes.append("_Как считал: день отправки в срок не входит — отсчёт со следующего рабочего дня; выходные "
+                         "и нерабочие праздничные дни не считаются (производственный календарь РФ)._")
+        if not cal.is_workday(start) and first.unit == "work":
+            notes.append(f"_{deadlines.fmt_day(start)} — нерабочий день, отсчёт начинается с ближайшего рабочего дня: "
+                         f"{deadlines.fmt_day(deadlines.next_workday(start, cal))}._")
+        for u, cnd in info["cond"]:
+            notes.append(f"_{u} визирует при условии: {cnd}._")
+        for d in sorted({x for x in dues if x in cal.short}):
+            notes.append(f"_{deadlines.fmt_day(d)} — предпраздничный день: рабочий день короче на 1 час._")
+        missing, prelim = cal.gaps(start, max(dues))
+        if missing:
+            notes.append(f"⚠️ Праздничные дни за этот период не учтены: в производственном календаре помощника нет "
+                         f"{', '.join(map(str, missing))} г. — учтены только выходные (суббота и воскресенье).")
+        if prelim:
+            notes.append(f"⚠️ Календарь на {', '.join(map(str, prelim))} г. предварительный: праздники по Трудовому "
+                         "кодексу учтены, переносы выходных по постановлению Правительства РФ ещё не внесены — "
+                         "дату стоит сверить.")
+        # Источники: только пункты, доступные роли (get_section фильтрует по уровню доступа)
+        sources, secs = [], []
+        for sec_id in dict.fromkeys(info["points"]):
+            hit = self.retriever.get_section("instr_dou", sec_id, s.role)
+            if hit:
+                sources.append(Source(citation(hit.meta), 100, hit.text, "instr_dou", sec_id))
+                secs.append(sec_id)
+        basis = []
+        if sources:
+            meta = self.retriever.get_section("instr_dou", secs[0], s.role).meta
+            basis.append(f"{meta['short_title']}, ред. {meta['version']} (с {fmt_date(meta['effective_date'])}), "
+                         f"п. {', '.join(secs)}")
+            if start < dt.date.fromisoformat(meta["effective_date"]):
+                notes.append(f"_Редакция {meta['version']} Инструкции действует с {fmt_date(meta['effective_date'])}: "
+                             "при отправке раньше этой даты сроки могли быть другими._")
+        m = get_matrix()
+        if info["row"]:
+            a = m.lookup(info["row"])
+            grp = "Внутренние" if a.row["group"] == "internal" else "Внешние"
+            sources.append(Source(m.citation(info["row"]), 100, a.row["title"], "matrix_viz",
+                                  f"{grp} документы, строка {a.row['num']}", kind="matrix"))
+            basis.append(m.citation(info["row"]))
+        # Простыми словами — шаблонная фраза кода (модель не нужна, ответ корректен при любом её состоянии)
+        when = deadlines.say_day(start, today)
+        due_words = f"{deadlines.say_day(dues[0], today)} ({deadlines.WEEKDAY_NAMES[dues[0].weekday()]})"
+        term = deadlines.days_word(first.days, first.unit)
+        if stage in ("approval", "review"):
+            simple = (f"от отправки {when} у подразделений есть {term} без выходных"
+                      + ("" if missing else " и праздников")
+                      + (" — все смотрят проект одновременно, поэтому ответы должны прийти" if info.get("mode") == "parallel"
+                         else ", поэтому рассмотрение должно закончиться")
+                      + f" не позже {due_words}.")
+            if len(dues) == 2:
+                simple += (f" Если подразделения смотрят проект по очереди — не позже "
+                           f"{deadlines.say_day(dues[1], today)}.")
+            simple += f" Если будут замечания, после доработки на повторное рассмотрение — снова {term}."
+        elif stage == "execution":
+            simple = f"документ, зарегистрированный {when}, нужно исполнить не позже {due_words}."
+        else:
+            obj = {"signing": "документ, направленный подписанту", "visa": "проект, направленный на визу",
+                   "linguistic": "проект, направленный на экспертизу"}[stage]
+            verb = {"signing": "подписать", "visa": "завизировать", "linguistic": "проверить"}[stage]
+            rule = ", как правило," if "как правило" in first.basis else ""
+            simple = f"{obj} {when}, нужно{rule} {verb} не позже {due_words}."
+        text = (head + "\n\n" + "\n".join(table) + "\n\n" + "\n\n".join(notes)
+                + ("\n\n**Основание:** " + "; ".join(basis) + "." if basis else "")
+                + f"\n\n**Простыми словами:** {simple[:1].upper() + simple[1:]}")
+        s.last_simple = "Проще говоря: " + simple
+        offer, actions = self._offer_template(s, calc.get("doc_text") or calc["query"])
+        return Reply(text + offer, sources=sources, actions=actions, intent="deadline_calc",
+                     meta={"row": info["row"], "calc": {"stage": stage, "start": start.isoformat(),
+                                                        "due": [d.isoformat() for d in dues]}})
+
     # ================================================================ шаблоны
     def start_template(self, s: Session, text: str) -> Reply:
         text = self._with_context(s, text)
@@ -843,13 +1185,17 @@ class Engine:
             "«Когда регистрировать входящий документ?»\n"
             "2. **Подсказывать, с кем согласовать** документ (по Матрице визирования) и **сроки** — "
             "«Кто визирует распоряжение о создании рабочей группы?»\n"
-            "3. **Готовить черновики .docx по модулям** документов, задавая вопросы по очереди — "
+            "3. **Считать сроки датами** по производственному календарю — «Если отправлю распоряжение на "
+            "согласование сегодня, когда будет готово?»\n"
+            "4. **Готовить черновики .docx по модулям** документов, задавая вопросы по очереди — "
             "«Нужно подготовить распоряжение о создании рабочей группы»\n"
-            "4. **Проверять загруженный черновик** (.docx/.pdf) на соответствие требованиям\n"
-            "5. **Подсказывать, куда обратиться**, если ответа в базе знаний нет.\n\n"
+            "5. **Проверять загруженный черновик** (.docx/.pdf) на соответствие требованиям\n"
+            "6. **Подсказывать, куда обратиться**, если ответа в базе знаний нет.\n\n"
             f"Роли: {role_titles}. Отвечаю только по документам базы знаний.",
             actions=[("Когда регистрировать входящий?", "Когда нужно зарегистрировать входящий документ?"),
                      ("С кем согласовать распоряжение?", "С кем согласовать распоряжение?"),
+                     ("Когда согласуют распоряжение?",
+                      "Если отправлю распоряжение на согласование сегодня, когда будет готово?"),
                      ("Подготовить распоряжение", "Нужно подготовить распоряжение о создании рабочей группы")],
             intent="help")
 
