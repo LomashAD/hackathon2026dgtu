@@ -6,6 +6,8 @@
 
 **Попробовать:** https://217-144-184-227.sslip.io — макет внутреннего портала с поп-ап виджетом помощника. Чат на отдельной странице: https://217-144-184-227.sslip.io/?chat. Вход по учётной записи. Логин и пароль для проверки в открытом репозитории не публикуются.
 
+**Видео демонстрации:** [смотреть / скачать (9 мин, 1080p, озвучка и субтитры)](https://github.com/LomashAD/hackathon2026dgtu/releases/download/demo-video-2026-10-24/demo-pomoshnik-dou.mp4) · [страница релиза](https://github.com/LomashAD/hackathon2026dgtu/releases/tag/demo-video-2026-10-24).
+
 | Ответ со ссылками и релевантностью | Поп-ап виджет на портале |
 |---|---|
 | ![Ответ с источниками](docs/screenshots/01_question_sources.png) | ![Виджет на портале](docs/screenshots/09_portal_widget.png) |
@@ -78,9 +80,11 @@
 | Схема взаимодействия с Инструкцией и базой знаний | [docs/kb_interaction.md](docs/kb_interaction.md) |
 | Механизмы поиска и формирования ответов | [docs/search_and_answering.md](docs/search_and_answering.md) |
 | Прототип или макет интерфейса | [docs/ui_mockup.md](docs/ui_mockup.md), скриншоты — [docs/screenshots](docs/screenshots) |
-| Демонстрация: видеозапись и ссылка на чат-бот | Ссылка: https://217-144-184-227.sslip.io. Видеозапись: _ссылка будет добавлена_. Сценарий показа — [docs/demo_script.md](docs/demo_script.md) |
+| Демонстрация: видеозапись и ссылка на чат-бот | Ссылка: https://217-144-184-227.sslip.io. Видеозапись: [demo-pomoshnik-dou.mp4](https://github.com/LomashAD/hackathon2026dgtu/releases/download/demo-video-2026-10-24/demo-pomoshnik-dou.mp4) (9 мин, 1080p, озвучка и русские субтитры; [релиз](https://github.com/LomashAD/hackathon2026dgtu/releases/tag/demo-video-2026-10-24)). Сценарий показа — [docs/demo_script.md](docs/demo_script.md) |
 
 ## Демонстрация
+
+**Видеозапись** — [demo-pomoshnik-dou.mp4](https://github.com/LomashAD/hackathon2026dgtu/releases/download/demo-video-2026-10-24/demo-pomoshnik-dou.mp4), 9 минут: идёт по пунктам ниже, затем дополнительные функции (проверка черновика, роли, админ-панель) и пять слайдов «Как устроено». Записана на демо-стенде 24.10.2026.
 
 Пункты из раздела «Требования к защите проекта» и как их показать:
 
