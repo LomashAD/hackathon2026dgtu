@@ -67,6 +67,12 @@
   @container (min-width: 528px) { #news-body > .card { flex-basis:calc((100% - 8px) / 2); } }
   @container (min-width: 796px) { #news-body > .card { flex-basis:calc((100% - 16px) / 3); } }
   @container (min-width: 1064px) { #news-body > .card { flex-basis:calc((100% - 24px) / 4); } }
+  /* «Новости» и «Сервисы»: кнопки прижаты к нижнему краю карточки — в одном ряду они на одной линии при любом
+     объёме текста. Первая кнопка после текста забирает свободное место (margin-top:auto), остальные — следом */
+  #news-body > .card, #tab-services .cards > .card { display:flex; flex-direction:column; }
+  #news-body > .card > .btn, #tab-services .cards > .card > .btn { align-self:flex-start; }
+  #news-body > .card > :not(.btn, .answer) + .btn, #tab-services .cards > .card > :not(.btn, .answer) + .btn { margin-top:auto; }
+  #news-body > .card > :not(.btn, .answer):has(+ .btn), #tab-services .cards > .card > :not(.btn, .answer):has(+ .btn) { margin-bottom:16px; }
   /* Feature Mosaic Card */
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
   h1 { font-size:36px; line-height:1.11; font-weight:500; letter-spacing:-0.5px; margin:0 0 24px; }
