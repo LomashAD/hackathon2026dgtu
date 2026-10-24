@@ -151,7 +151,8 @@
     <pre>&lt;script src="https://&lt;адрес помощника&gt;/copilot/index.js"&gt;&lt;/script&gt;
 &lt;script&gt;
   window.mountChainlitWidget({ chainlitServer: "https://&lt;адрес помощника&gt;", theme: "dark",
-    customCssUrl: "https://&lt;адрес помощника&gt;/public/widget/copilot.css" });
+    customCssUrl: "https://&lt;адрес помощника&gt;/public/widget/copilot.css",
+    button: { imageUrl: "https://&lt;адрес помощника&gt;/public/favicon.svg" } });
 &lt;/script&gt;</pre>
     <p>Для портала на другом адресе надёжнее виджет в iframe одной строкой — <code>&lt;script src="…/widget.js" defer&gt;&lt;/script&gt;</code>:
       Copilot с чужого адреса требует открыть помощнику CORS и вход по токену (см. docs/frontend_notes.md).</p>
@@ -191,6 +192,7 @@
       chainlitServer: location.origin,
       theme: theme(),
       customCssUrl: '/public/widget/copilot.css',
+      button: { imageUrl: '/public/favicon.svg' },   // знак помощника, как в шапке
     });
     window.__copilotMounted = true;
   }

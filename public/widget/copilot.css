@@ -2,13 +2,14 @@
    поэтому стили чата подключаются сюда целиком, а ниже — кнопка и окно виджета (DESIGN.md «Graphite»). */
 @import url("/public/custom.css");
 
-/* Кнопка — Dark Pill Icon Button (56 px вместо 32 px: это главная точка входа) */
+/* Кнопка — знак помощника, как в шапке (demo.html → button.imageUrl = /public/favicon.svg), 56 px; в обеих темах тёмная.
+   Рамку рисует сам знак; inset-тень повторяет её, пока знак скрыт крестиком открытого окна */
 #chainlit-copilot-button {
-  width: 56px; height: 56px; right: 24px; bottom: 24px;
-  background: var(--g-surface); color: var(--g-text);
-  border: 1px solid var(--g-edge); box-shadow: var(--shadow-sm);
+  width: 56px; height: 56px; right: 24px; bottom: 24px; padding: 0; border-radius: 12px; border: 0;
+  background: #0a0a0a; color: #fafafa;
+  box-shadow: inset 0 0 0 1px #262626, var(--shadow-sm);
 }
-#chainlit-copilot-button:hover { background: var(--g-surface); border-color: var(--g-steel); }
+#chainlit-copilot-button:hover { background: #0a0a0a; box-shadow: inset 0 0 0 1px #464646, var(--shadow-sm); }
 
 /* Логотип в шапке окна: знак и название читаемого размера */
 #chainlit-copilot-chat img.logo { height: 22px; width: auto; max-width: 240px; }
