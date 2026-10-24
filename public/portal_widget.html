@@ -171,20 +171,31 @@
   /* Подсказка выезжает из-под кнопки при наведении и при фокусе с клавиатуры */
   #fab:hover .hint, #fab:focus-visible .hint { opacity:1; transform:none; pointer-events:auto; }
   @media (prefers-reduced-motion: reduce) { #fab .hint { transform:none; transition:none; } }
-  #panel { position:fixed; right:24px; bottom:96px; width:520px; height:640px; max-height:calc(100vh - 120px);
+  /* Размер окна меняется мышью (--panel-w/--panel-h задаёт скрипт ниже), но окно всегда помещается на экране */
+  #panel { position:fixed; right:24px; bottom:96px; width:var(--panel-w, 520px); height:var(--panel-h, 640px);
+           max-width:calc(100vw - 48px); max-height:calc(100vh - 120px);
            background:var(--bg); border:1px solid var(--line); border-radius:10px; overflow:hidden; box-shadow:var(--shadow-md); display:none;
            flex-direction:column; z-index:10; }
   #panel.open { display:flex; }
   #panel .bar { background:var(--surface); color:var(--ink); padding:8px 8px 8px 16px; border-bottom:1px solid var(--line);
                 display:flex; justify-content:space-between; align-items:center; font-size:14px; line-height:20px; font-weight:600; }
   #panel iframe { border:0; flex:1; width:100%; background:var(--bg); }
+  /* Окно прижато к правому нижнему углу, поэтому тянуть — за левый верхний угол, левый или верхний край */
+  #panel .rs { position:absolute; z-index:1; touch-action:none; }
+  #panel .rs-x { left:0; top:0; bottom:0; width:6px; cursor:ew-resize; }
+  #panel .rs-y { left:0; top:0; right:0; height:6px; cursor:ns-resize; }
+  #panel .rs-xy { left:0; top:0; width:18px; height:18px; cursor:nwse-resize; color:var(--ash); border-radius:10px 0 0 0; }
+  #panel .rs-xy:hover, #panel.resizing .rs-xy { color:var(--ink); }
+  #panel .rs-xy:focus-visible { outline-offset:-2px; }   /* снаружи рамку обрезал бы край окна */
+  #panel .rs-xy svg { position:absolute; left:4px; top:4px; width:10px; height:10px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; }
+  #panel.resizing iframe { pointer-events:none; }   /* иначе iframe перехватит мышь, пока тянут */
   @media (max-width: 700px) {
     header { margin:8px 8px 0; padding:8px; }
     h1 { font-size:24px; line-height:1.17; font-weight:600; letter-spacing:0; }
     .grid { grid-template-columns:1fr; } header nav a { padding:6px 8px; }
     header { row-gap:4px; } header nav { order:3; flex-basis:100%; } #me-name { max-width:170px; }
     .form-grid { grid-template-columns:1fr; }
-    #panel { right:8px; left:8px; width:auto; bottom:88px; } #fab .hint { display:none; }
+    #panel { right:8px; left:8px; width:auto; height:640px; max-width:none; bottom:88px; } #panel .rs { display:none; } #fab .hint { display:none; }
     #fab { right:16px; bottom:16px; }
     #tab-docs th:nth-child(3), #tab-docs td:nth-child(3) { display:none; }
   }
@@ -491,6 +502,10 @@
 <div id="panel" role="dialog" aria-label="Помощник по документообороту">
   <div class="bar"><span>Помощник по документообороту</span><button id="close" aria-label="Закрыть">×</button></div>
   <iframe id="frame" title="Чат-помощник"></iframe>
+  <div class="rs rs-x" data-resize="x" aria-hidden="true"></div>
+  <div class="rs rs-y" data-resize="y" aria-hidden="true"></div>
+  <div class="rs rs-xy" data-resize="xy" role="button" tabindex="0" aria-label="Изменить размер окна: стрелки, Home — прежний размер"
+       title="Потяните, чтобы изменить размер окна. Двойной щелчок — прежний размер"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 5 5 1M1 9 9 1"/></svg></div>
 </div>
 <dialog id="full" aria-label="Ответ помощника">
   <div class="bar"><span class="title"></span><button id="full-close" aria-label="Закрыть">×</button></div>
@@ -507,6 +522,51 @@
     if (e.origin === location.origin && e.data && e.data.type === 'dou-assistant:close') panel.classList.remove('open');
   });
   document.querySelectorAll('[data-open-chat]').forEach(b => b.onclick = openChat);
+
+  // --- размер окна помощника: тянуть за левый верхний угол или край, стрелки на уголке; двойной щелчок или Home — прежний.
+  // Размер запоминается в браузере сотрудника (тот же ключ у виджета public/widget.js)
+  const SIZE_KEY = 'dou-assistant:panel-size', MIN_W = 360, MIN_H = 400;
+  function setPanelSize(w, h, save) {
+    w = Math.round(Math.max(MIN_W, Math.min(w, innerWidth - 48)));
+    h = Math.round(Math.max(MIN_H, Math.min(h, innerHeight - 120)));
+    panel.style.setProperty('--panel-w', w + 'px');
+    panel.style.setProperty('--panel-h', h + 'px');
+    if (save) try { localStorage.setItem(SIZE_KEY, JSON.stringify({w, h})); } catch (e) { /* размер живёт до перезагрузки */ }
+  }
+  function resetPanelSize() {
+    panel.style.removeProperty('--panel-w');
+    panel.style.removeProperty('--panel-h');
+    try { localStorage.removeItem(SIZE_KEY); } catch (e) { /* нечего удалять */ }
+  }
+  try {   // сохранённый размер больше экрана ужмёт max-width/max-height в CSS
+    const s = JSON.parse(localStorage.getItem(SIZE_KEY));
+    if (s && s.w >= MIN_W && s.h >= MIN_H) { panel.style.setProperty('--panel-w', s.w + 'px'); panel.style.setProperty('--panel-h', s.h + 'px'); }
+  } catch (e) { /* размер по умолчанию */ }
+  panel.querySelectorAll('[data-resize]').forEach(h => {
+    h.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const r = panel.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY, mode = h.dataset.resize;
+      h.setPointerCapture(e.pointerId);
+      panel.classList.add('resizing');
+      h.onpointermove = m => setPanelSize(mode === 'y' ? r.width : r.width + x0 - m.clientX,
+                                          mode === 'x' ? r.height : r.height + y0 - m.clientY, false);
+      h.onpointerup = h.onpointercancel = () => {
+        h.onpointermove = h.onpointerup = h.onpointercancel = null;
+        panel.classList.remove('resizing');
+        const done = panel.getBoundingClientRect();
+        setPanelSize(done.width, done.height, true);
+      };
+    });
+  });
+  const grip = panel.querySelector('.rs-xy');
+  grip.ondblclick = resetPanelSize;
+  grip.onkeydown = e => {
+    const step = e.shiftKey ? 64 : 16, r = panel.getBoundingClientRect();
+    const d = {ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step]}[e.key];
+    if (d) { e.preventDefault(); setPanelSize(r.width + d[0], r.height + d[1], true); }
+    if (e.key === 'Home') { e.preventDefault(); resetPanelSize(); }
+  };
 
   // --- тема: тёмная по умолчанию (DESIGN.md «Graphite»), кнопка ☀/☾ переключает. Ключ общий с чатом Chainlit
   // (тот же адрес), поэтому чат в окне виджета меняет тему вместе с порталом, а смена темы в чате меняет портал.
