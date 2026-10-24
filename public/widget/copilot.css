@@ -9,3 +9,8 @@
   border: 1px solid var(--g-edge); box-shadow: var(--shadow-sm);
 }
 #chainlit-copilot-button:hover { background: var(--g-surface); border-color: var(--g-steel); }
+
+/* Логотип в шапке окна: знак и название читаемого размера */
+#chainlit-copilot-chat img.logo { height: 22px; width: auto; max-width: 240px; }
+/* Copilot берёт логотип для светлой темы и в тёмной — подменяем на светлый текст */
+#cl-shadow-root.dark #chainlit-copilot-chat img.logo { content: url("/public/logo_dark.svg"); }

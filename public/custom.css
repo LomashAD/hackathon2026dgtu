@@ -360,27 +360,30 @@ button[id^="g-util-"]:hover, button[id^="g-fb-"]:hover { color: var(--g-text); b
   border: 1px solid var(--g-edge); box-shadow: var(--shadow-sm);
 }
 
-/* ================================================================== телефоны */
-@media (max-width: 640px) {
-  #header { margin: var(--spacing-8) var(--spacing-8) 0; height: 48px; }
-  #header > div:first-child::after { width: 28px; background-size: auto 100%; background-image: url("/public/favicon.svg"); border-radius: 6px; }
-  .light #header > div:first-child::after { background-image: url("/public/favicon.svg"); }
-  #readme-button { padding: var(--spacing-8); }
+/* ================================================================== узкий экран и узкое окно
+   Карточки подстраиваются под ширину сообщения (container query): так они верны и на телефоне,
+   и в узком окне виджета Copilot на широком экране. Шапка, поле ввода и аватар — по ширине экрана. */
+.ai-message .message-content { container: msg / inline-size; }
+@container msg (max-width: 560px) {
   .g-welcome { padding: var(--spacing-24) var(--spacing-16); }
   .g-welcome__art { width: 112px; height: 112px; top: -16px; right: -20px; opacity: .6; }
   .g-welcome__body { max-width: none; }
-  .g-welcome__title { padding-right: 56px; }
-  .g-welcome__title { font-size: var(--text-feature-heading); line-height: var(--leading-feature-heading); font-weight: 600; letter-spacing: 0; }
+  .g-welcome__title { padding-right: 56px; font-size: var(--text-feature-heading); line-height: var(--leading-feature-heading); font-weight: 600; letter-spacing: 0; }
   .g-welcome__grid { grid-template-columns: 1fr; }
   .g-source { grid-template-columns: 24px minmax(0, 1fr); }
   .g-rel { grid-column: 2; }
   .message-content a.inline-file .bg-card { flex-wrap: wrap; }
   .message-content a.inline-file .bg-card::after { content: "Скачать"; }
+}
+@media (max-width: 640px) {
+  #header { margin: var(--spacing-8) var(--spacing-8) 0; height: 48px; }
+  #header > div:first-child::after { width: 28px; background-size: auto 100%; background-image: url("/public/favicon.svg"); border-radius: 6px; }
+  .light #header > div:first-child::after { background-image: url("/public/favicon.svg"); }
+  #readme-button { padding: var(--spacing-8); }
   [data-step-type="user_message"] .bg-accent { max-width: 85%; }
   /* аватар помощника на узком экране не показываем — вся ширина под текст */
   .ai-message { gap: 0; }
   .ai-message > span:first-child { display: none; }
-  #message-composer { border-radius: var(--radius-inputs); }
 }
 
 /* «О помощнике» (chainlit.md): заголовки по шкале DESIGN.md — 36/500 и 24/600, не тяжелее 600 */
