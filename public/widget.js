@@ -36,21 +36,27 @@
             opacity: 0; transform: translateX(12px); pointer-events: none; transition: opacity .2s ease-out, transform .2s ease-out; }
     /* Подсказка выезжает из-под кнопки при наведении и при фокусе с клавиатуры */
     .fab:hover .hint, .fab:focus-visible .hint { opacity: 1; transform: none; pointer-events: auto; }
-    @media (prefers-reduced-motion: reduce) { .hint { transform: none; transition: none; } }
-    /* Размер окна меняется мышью (--panel-w/--panel-h задаёт скрипт ниже), но окно всегда помещается на экране */
-    .panel { position: fixed; right: 24px; bottom: 96px; box-sizing: border-box; width: var(--panel-w, 520px); height: var(--panel-h, 640px);
-             max-width: calc(100vw - 48px); max-height: calc(100vh - 120px);
+    /* Окно растянуто вниз до кнопки — кнопка уходит; хватает места под окном — возвращается (скрипт ниже) */
+    .fab { transition: opacity .2s ease-out, visibility 0s; }
+    .fab.tucked { opacity: 0; visibility: hidden; transition: opacity .2s ease-out, visibility 0s .2s; }
+    @media (prefers-reduced-motion: reduce) { .hint { transform: none; transition: none; } .fab, .fab.tucked { transition: none; } }
+    /* Размер и нижний отступ окна меняются мышью (--panel-w/-h/-b задаёт скрипт ниже), но окно всегда помещается на экране */
+    .panel { position: fixed; right: 24px; bottom: var(--panel-b, 96px); box-sizing: border-box; width: var(--panel-w, 520px);
+             height: var(--panel-h, 640px); max-width: calc(100vw - 48px); max-height: calc(100vh - var(--panel-b, 96px) - 24px);
              display: none; flex-direction: column; background: #0a0a0a; border: 1px solid #262626; border-radius: 10px;
              overflow: hidden; box-shadow: rgba(0,0,0,.3) 0 8px 10px 0; z-index: 2147483000; }
     .panel.open { display: flex; }
-    /* Окно прижато к правому нижнему углу, поэтому тянуть — за левый верхний угол, левый или верхний край */
+    /* Окно прижато к правому краю, поэтому тянуть — за уголки слева, левый, верхний или нижний край */
     .rs { position: absolute; z-index: 1; touch-action: none; }
-    .rs-x { left: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
-    .rs-y { left: 0; top: 0; right: 0; height: 6px; cursor: ns-resize; }
-    .rs-xy { left: 0; top: 0; width: 18px; height: 18px; cursor: nwse-resize; color: #737373; border-radius: 10px 0 0 0; }
-    .rs-xy:hover, .resizing .rs-xy { color: #fafafa; }
-    .rs-xy:focus-visible { outline: 2px solid #737373; outline-offset: -2px; }
-    .rs-xy svg { position: absolute; left: 4px; top: 4px; width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+    .rs-l { left: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
+    .rs-t { left: 0; top: 0; right: 0; height: 6px; cursor: ns-resize; }
+    .rs-b { left: 0; bottom: 0; right: 0; height: 6px; cursor: ns-resize; }
+    .grip { left: 0; width: 18px; height: 18px; color: #737373; }
+    .rs-lt { top: 0; cursor: nwse-resize; border-radius: 10px 0 0 0; }
+    .rs-lb { bottom: 0; cursor: nesw-resize; border-radius: 0 0 0 10px; }
+    .grip:hover, .grip.dragging { color: #fafafa; }
+    .grip:focus-visible { outline: 2px solid #737373; outline-offset: -2px; }
+    .grip svg { position: absolute; left: 4px; top: 4px; width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
     .resizing iframe { pointer-events: none; }   /* иначе iframe перехватит мышь, пока тянут */
     .bar { background: #171717; color: #fafafa; padding: 8px 8px 8px 16px; border-bottom: 1px solid #262626; display: flex;
            justify-content: space-between; align-items: center; gap: 8px; font: 600 14px/20px ${font}; }
@@ -58,17 +64,22 @@
              border-radius: 8px; color: #a1a1a1; font: 18px/1 ${font}; cursor: pointer; }
     .close:hover { color: #fafafa; background: #262626; }
     iframe { border: 0; flex: 1; width: 100%; background: #0a0a0a; }
-    @media (max-width: 700px) { .panel { left: 8px; right: 8px; width: auto; height: 640px; max-width: none; bottom: 88px; } .rs { display: none; }
+    @media (max-width: 700px) { .panel { left: 8px; right: 8px; width: auto; height: 640px; max-width: none; bottom: 88px; max-height: calc(100vh - 120px); }
+                                .rs { display: none; }
                                 .fab { right: 16px; bottom: 16px; } .hint { display: none; } }
   </style>
   <div class="panel" role="dialog"><div class="bar"><span class="title"></span>
     <button class="close" type="button" aria-label="Закрыть">×</button></div>
     <iframe title="Чат-помощник по документообороту" allow="clipboard-write"></iframe>
-    <div class="rs rs-x" data-resize="x" aria-hidden="true"></div>
-    <div class="rs rs-y" data-resize="y" aria-hidden="true"></div>
-    <div class="rs rs-xy" data-resize="xy" role="button" tabindex="0" aria-label="Изменить размер окна: стрелки, Home — прежний размер"
+    <div class="rs rs-l" data-resize="l" aria-hidden="true"></div>
+    <div class="rs rs-t" data-resize="t" aria-hidden="true"></div>
+    <div class="rs rs-b" data-resize="b" aria-hidden="true"></div>
+    <div class="rs grip rs-lt" data-resize="lt" role="button" tabindex="0" aria-label="Изменить размер окна, левый верхний угол: стрелки, Home — прежний размер"
          title="Потяните, чтобы изменить размер окна. Двойной щелчок — прежний размер"><svg viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M1 5 5 1M1 9 9 1"/></svg></div></div>
+      <path d="M1 5 5 1M1 9 9 1"/></svg></div>
+    <div class="rs grip rs-lb" data-resize="lb" role="button" tabindex="0" aria-label="Изменить размер окна, левый нижний угол: стрелки, Home — прежний размер"
+         title="Потяните, чтобы изменить размер окна. Двойной щелчок — прежний размер"><svg viewBox="0 0 10 10" aria-hidden="true">
+      <path d="M1 5 5 9M1 1 9 9"/></svg></div></div>
   <button class="fab" type="button" aria-label="Открыть помощника"><svg viewBox="0 0 32 32" aria-hidden="true">
     <defs><linearGradient id="fab-spectrum" x1="0" y1="0" x2="1" y2="0"><stop offset=".15" stop-color="#ffb931"/>
       <stop offset=".3" stop-color="#ffffff"/><stop offset=".4" stop-color="#ffffff"/><stop offset=".5" stop-color="#2e73fc"/></linearGradient></defs>
@@ -81,60 +92,79 @@
   root.querySelector('.panel').setAttribute('aria-label', title);
   root.querySelector('.hint').textContent = me.dataset.label || 'Спросить про документооборот';
 
-  const panel = root.querySelector('.panel'), frame = root.querySelector('iframe');
-  const open = () => { if (!frame.src) frame.src = base + '/?chat'; panel.classList.add('open'); };
-  const close = () => panel.classList.remove('open');
-  root.querySelector('.fab').onclick = () => (panel.classList.contains('open') ? close() : open());
+  const panel = root.querySelector('.panel'), frame = root.querySelector('iframe'), fab = root.querySelector('.fab');
+  // Кнопка уходит, когда открытое окно растянуто вниз до неё, и возвращается, когда под окном снова хватает места
+  const updateFab = () => {
+    const p = panel.getBoundingClientRect(), f = fab.getBoundingClientRect();
+    fab.classList.toggle('tucked', panel.classList.contains('open') && p.bottom > f.top - 8);
+  };
+  const open = () => { if (!frame.src) frame.src = base + '/?chat'; panel.classList.add('open'); updateFab(); };
+  const close = () => { panel.classList.remove('open'); updateFab(); };
+  fab.onclick = () => (panel.classList.contains('open') ? close() : open());
   root.querySelector('.close').onclick = close;
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
   // Esc внутри чата: iframe сообщает о нём сам (public/theme.js)
   window.addEventListener('message', e => { if (e.origin === base && e.data && e.data.type === 'dou-assistant:close') close(); });
+  window.addEventListener('resize', updateFab);
   window.douAssistant = {open, close};   // портал может открыть помощника своей кнопкой
 
-  // Размер окна: тянуть за левый верхний угол или край, стрелки на уголке; двойной щелчок или Home — прежний.
+  // Размер окна: тянуть за уголки слева или за левый, верхний, нижний край, стрелки на уголках; двойной щелчок или Home — прежний.
   // Запоминается в браузере сотрудника для адреса портала
-  const SIZE_KEY = 'dou-assistant:panel-size', MIN_W = 360, MIN_H = 400;
-  function setSize(w, h, save) {
-    w = Math.round(Math.max(MIN_W, Math.min(w, innerWidth - 48)));
-    h = Math.round(Math.max(MIN_H, Math.min(h, innerHeight - 120)));
-    panel.style.setProperty('--panel-w', w + 'px');
-    panel.style.setProperty('--panel-h', h + 'px');
-    if (save) try { localStorage.setItem(SIZE_KEY, JSON.stringify({w, h})); } catch (e) { /* размер живёт до перезагрузки */ }
+  const SIZE_KEY = 'dou-assistant:panel-size', MIN_W = 360, MIN_H = 400, EDGE = 24;
+  function setSize(w, h, b, save) {
+    const v = {w: Math.round(w), h: Math.round(h), b: Math.round(b)};
+    panel.style.setProperty('--panel-w', v.w + 'px');
+    panel.style.setProperty('--panel-h', v.h + 'px');
+    panel.style.setProperty('--panel-b', v.b + 'px');
+    if (save) try { localStorage.setItem(SIZE_KEY, JSON.stringify(v)); } catch (e) { /* размер живёт до перезагрузки */ }
+    updateFab();
+  }
+  // Новые края окна: r — прежние, dx/dy — сдвиг указателя, mode — какие края двигать (l, t, b); правый край всегда на месте
+  function moveEdges(r, mode, dx, dy, save) {
+    let {left, top, bottom} = r;
+    if (mode.includes('l')) left = Math.max(EDGE, Math.min(left + dx, r.right - MIN_W));
+    if (mode.includes('t')) top = Math.max(EDGE, Math.min(top + dy, bottom - MIN_H));
+    if (mode.includes('b')) bottom = Math.min(innerHeight - EDGE, Math.max(bottom + dy, top + MIN_H));
+    setSize(r.right - left, bottom - top, innerHeight - bottom, save);
   }
   function resetSize() {
-    panel.style.removeProperty('--panel-w');
-    panel.style.removeProperty('--panel-h');
+    ['--panel-w', '--panel-h', '--panel-b'].forEach(p => panel.style.removeProperty(p));
     try { localStorage.removeItem(SIZE_KEY); } catch (e) { /* нечего удалять */ }
+    updateFab();
   }
   try {   // сохранённый размер больше экрана ужмёт max-width/max-height в CSS
     const s = JSON.parse(localStorage.getItem(SIZE_KEY));
-    if (s && s.w >= MIN_W && s.h >= MIN_H) { panel.style.setProperty('--panel-w', s.w + 'px'); panel.style.setProperty('--panel-h', s.h + 'px'); }
+    if (s && s.w >= MIN_W && s.h >= MIN_H) {
+      panel.style.setProperty('--panel-w', s.w + 'px');
+      panel.style.setProperty('--panel-h', s.h + 'px');
+      if (s.b >= EDGE) panel.style.setProperty('--panel-b', s.b + 'px');
+    }
   } catch (e) { /* размер по умолчанию */ }
   root.querySelectorAll('[data-resize]').forEach(h => {
     h.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       e.preventDefault();
-      const r = panel.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY, mode = h.dataset.resize;
+      const r = panel.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
       h.setPointerCapture(e.pointerId);
       panel.classList.add('resizing');
-      h.onpointermove = m => setSize(mode === 'y' ? r.width : r.width + x0 - m.clientX,
-                                     mode === 'x' ? r.height : r.height + y0 - m.clientY, false);
+      h.classList.add('dragging');
+      h.onpointermove = m => moveEdges(r, h.dataset.resize, m.clientX - x0, m.clientY - y0, false);
       h.onpointerup = h.onpointercancel = () => {
         h.onpointermove = h.onpointerup = h.onpointercancel = null;
         panel.classList.remove('resizing');
-        const done = panel.getBoundingClientRect();
-        setSize(done.width, done.height, true);
+        h.classList.remove('dragging');
+        moveEdges(panel.getBoundingClientRect(), '', 0, 0, true);   // запомнить, что получилось на экране
       };
     });
+    if (!h.classList.contains('grip')) return;
+    h.ondblclick = resetSize;
+    h.onkeydown = e => {   // стрелка двигает уголок в свою сторону
+      const step = e.shiftKey ? 64 : 16;
+      const d = {ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step]}[e.key];
+      if (d) { e.preventDefault(); moveEdges(panel.getBoundingClientRect(), h.dataset.resize, d[0], d[1], true); }
+      if (e.key === 'Home') { e.preventDefault(); resetSize(); }
+    };
   });
-  const grip = root.querySelector('.rs-xy');
-  grip.ondblclick = resetSize;
-  grip.onkeydown = e => {
-    const step = e.shiftKey ? 64 : 16, r = panel.getBoundingClientRect();
-    const d = {ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step]}[e.key];
-    if (d) { e.preventDefault(); setSize(r.width + d[0], r.height + d[1], true); }
-    if (e.key === 'Home') { e.preventDefault(); resetSize(); }
-  };
 
   const mount = () => document.body.appendChild(host);
   if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
