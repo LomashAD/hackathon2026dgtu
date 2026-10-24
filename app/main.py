@@ -7,7 +7,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import sys
+import uuid
 from pathlib import Path
 
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
@@ -18,7 +20,7 @@ from chainlit.input_widget import Switch  # noqa: E402
 
 from app.api import install_routes  # noqa: E402
 from app.config import path  # noqa: E402
-from app.dialog.engine import Reply, Session, get_engine  # noqa: E402
+from app.dialog.engine import Engine, Reply, Session, get_engine  # noqa: E402
 from app.security import audit, users  # noqa: E402
 from app.security.access import can_view_archive, roles  # noqa: E402
 
@@ -31,6 +33,54 @@ for noisy in ("httpx", "chromadb", "httpcore"):
 install_routes()
 users.ensure_auth_secret()
 RELOGIN = "Сессия завершена: учётная запись заблокирована или пароль изменён. Войдите заново."
+
+# ---------------------------------------------------------------- отображение (DESIGN.md «Graphite»)
+# Карточки в сообщениях — CustomElement Chainlit (public/elements/*.jsx), стили — public/custom.css.
+# Всё строится из того, что уже отдаёт движок (Reply), без новых полей.
+WELCOME_TAGS = ("Вопрос по Инструкции", "Согласование по Матрице", "Черновик по модулю")
+_ARCHIVED = " [АРХИВНАЯ РЕДАКЦИЯ]"
+_CITE = re.compile(r"^(?P<doc>.+?), ред\. (?P<ver>[^\s,]+)(?: \(с (?P<date>[^)]+)\))?, (?P<where>.+)$")
+_FILL_STEP = re.compile(r"\*\*Вопрос (\d+) из (\d+)\.\*\*")
+_TEMPLATE = re.compile(r"(?:Подобран шаблон: \*\*|Черновик \*\*«|Сейчас заполняем \*\*«)(?P<title>[^*»]+)")
+_CONTACT = re.compile(r"\n*^\*\*Куда обратиться:\*\* (?P<unit>.+) \((?P<basis>[^()]+)\)\.$", re.M)
+
+
+def _action_id(kind: str) -> str:
+    # Префикс id — вид кнопки для CSS: quick — вариант ответа, util — служебная, fb — оценка
+    return f"g-{kind}-{uuid.uuid4().hex[:12]}"
+
+
+def _source_card(n: int, src) -> dict:
+    """Ссылка на источник (engine.citation) → поля карточки: пункт, документ, редакция, дата, глава."""
+    label = src.label.removesuffix(_ARCHIVED)
+    card = {"n": n, "where": label, "doc": "", "version": "", "date": "", "head": "", "percent": src.percent,
+            "related": src.related_to, "archived": src.label.endswith(_ARCHIVED),
+            "basis": "чек-лист" if src.kind == "checklist" else "куда обратиться" if src.kind == "contact" else ""}
+    if m := _CITE.match(label):
+        where, _, head = m["where"].partition(" — ")
+        card.update(doc=m["doc"], version=m["ver"], date=m["date"] or "", where=where, head=head)
+    return card
+
+
+def _state(reply: Reply) -> dict | None:
+    """Заголовок над ответом: шаг заполнения шаблона, готовый черновик, нет ответа, уточнение, проверка."""
+    if m := _FILL_STEP.search(reply.text):
+        if t := _TEMPLATE.search(reply.text):
+            cl.user_session.set("fill_title", t["title"])
+        return {"kind": "fill", "label": "Черновик по шаблону", "title": cl.user_session.get("fill_title") or "",
+                "step": int(m[1]), "total": int(m[2])}
+    if reply.files:
+        t = _TEMPLATE.search(reply.text)
+        return {"kind": "ready", "label": "Черновик готов", "title": t["title"] if t else ""}
+    if reply.refused:
+        return {"kind": "refused", "label": "Нет ответа в базе знаний"}
+    if reply.meta.get("clarification"):
+        return {"kind": "clarify", "label": "Уточняющий вопрос"}
+    if reply.intent == "check_doc" and "ok" in reply.meta:
+        issues = reply.meta.get("issues") or 0
+        return {"kind": "review", "label": "Проверка черновика",
+                "title": "Замечаний нет" if reply.meta["ok"] and not issues else f"Замечаний: {issues}"}
+    return None
 
 
 @cl.password_auth_callback
@@ -70,7 +120,17 @@ async def start():
         await cl.ChatSettings([Switch(id="archive", label="Искать также в архивных редакциях", initial=False)]).send()
     # Справка — по команде /help (обычный текст, его распознаёт классификатор намерений). Команды Chainlit
     # (set_commands) не подходят: Enter после «/help» только выбирает команду, а не отправляет сообщение.
-    await cl.Message(content=f"Роль: **{roles()[role]['title']}**.\n\nЧто я умею — команда **/help**.").send()
+    welcome = cl.CustomElement(name="Welcome", display="inline", props={
+        "title": "Помощник по документообороту",
+        "lead": "Отвечаю по Инструкции по ДОУ, Матрице обязательного визирования и модулям документов — "
+                "со ссылками на пункты и процентом релевантности. Готовлю черновики .docx по шаблонам.",
+        "role": roles()[role]["title"],
+        "label": "Попробуйте спросить",
+        "examples": [{"tag": tag, "label": label, "text": text}
+                     for tag, (label, text) in zip(WELCOME_TAGS, Engine.EXAMPLES)],
+        "hint": ["Что я умею — команда ", "/help", ". Черновик ", ".docx", " или ", ".pdf",
+                 " можно перетащить в окно — проверю по требованиям Инструкции."]})
+    await cl.Message(content="", elements=[welcome]).send()
 
 
 @cl.on_settings_update
@@ -83,28 +143,42 @@ async def settings_update(settings):
 async def _send(reply: Reply) -> None:
     elements = []
     text = reply.text
-    actions = [cl.Action(name="quick", payload={"text": payload}, label=label) for label, payload in reply.actions]
+    if state := _state(reply):
+        elements.append(cl.CustomElement(name="State", props=state, display="inline"))
+        if state["kind"] == "ready":
+            text = text.removeprefix("✅ ")   # «готово» уже в заголовке состояния
+    if reply.refused and not reply.meta.get("side") and (m := _CONTACT.search(text)):
+        # «Куда обратиться» — отдельной карточкой вместо строки в тексте
+        text = text[:m.start()] + text[m.end():]
+        elements.append(cl.CustomElement(name="Contact", display="inline",
+                                         props={"label": "Куда обратиться", "unit": m["unit"], "basis": m["basis"]}))
+    actions = [cl.Action(name="quick", payload={"text": payload}, label=label, id=_action_id("quick"))
+               for label, payload in reply.actions]
     if reply.sources:
-        lines = ["", "**Источники:**"]
-        for i, src in enumerate(reply.sources, 1):
-            pct = f" — релевантность **{src.percent} %**" if src.percent is not None else ""
-            rel = f" (связанный с п. {src.related_to})" if src.related_to else ""
-            lines.append(f"{i}. {src.label}{pct}{rel}")
-        text += "\n" + "\n".join(lines)
+        elements.append(cl.CustomElement(name="Sources", display="inline", props={
+            "title": "Источники", "items": [_source_card(i, s) for i, s in enumerate(reply.sources, 1)]}))
         # Полные тексты источников — по кнопке (side-элементы Chainlit 2.12 склеиваются по всему чату)
         store = cl.user_session.get("sources") or {}
         key = str(len(store) + 1)
         store[key] = [(s.label, s.percent, s.text) for s in reply.sources]
         cl.user_session.set("sources", store)
-        actions.append(cl.Action(name="show_sources", payload={"key": key}, label="📄 Тексты пунктов"))
+        actions.append(cl.Action(name="show_sources", payload={"key": key}, label="📄 Тексты пунктов",
+                                 id=_action_id("util")))
     for f in reply.files:
         elements.append(cl.File(name=f.name, path=str(f), display="inline",
                                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
     if reply.intent not in ("help", "smalltalk", "cancel", "") and not reply.meta.get("clarification"):
-        actions += [cl.Action(name="feedback", payload={"v": "up"}, label="👍"),
-                    cl.Action(name="feedback", payload={"v": "down"}, label="👎")]
+        actions += [cl.Action(name="feedback", payload={"v": "up"}, icon="thumbs-up", tooltip="Ответ помог",
+                              id=_action_id("fb")),
+                    cl.Action(name="feedback", payload={"v": "down"}, icon="thumbs-down", tooltip="Ответ не помог",
+                              id=_action_id("fb"))]
     if reply.meta.get("latency_ms") is not None:
-        text += f"\n\n_⏱ {reply.meta['latency_ms'] / 1000:.1f} с_"
+        latency = f"⏱ {reply.meta['latency_ms'] / 1000:.1f} с"
+        sources = next((e for e in elements if getattr(e, "name", "") == "Sources"), None)
+        if sources is not None:
+            sources.props["latency"] = latency   # время ответа — в шапке источников, под текстом
+        else:
+            text += f"\n\n_{latency}_"
     await cl.Message(content=text, elements=elements, actions=actions).send()
 
 

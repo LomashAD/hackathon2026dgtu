@@ -117,7 +117,8 @@ reaction_on_message_received = false
 # Name of the assistant.
 name = "Помощник по документообороту"
 
-# default_theme = "dark"
+# Тёмная тема — основная в DESIGN.md (Theme: dark); светлая доступна кнопкой в шапке
+default_theme = "dark"
 
 # Force a specific language for all users (e.g., "en-US", "he-IL", "fr-FR")
 # If not set, the browser's language will be used
@@ -137,12 +138,13 @@ language = "ru-RU"
 confirm_new_chat = true
 
 # Description of the assistant. This is used for HTML tags.
-# description = ""
+description = "Чат-помощник по Инструкции по документационному обеспечению управления: ответы со ссылками на пункты и процентом релевантности, согласующие по Матрице, черновики .docx по модулям документов"
 
 # Chain of Thought (CoT) display mode. Can be "hidden", "tool_call" or "full".
 cot = "full"
 
 # Specify a CSS file that can be used to customize the user interface.
+# Оформление по DESIGN.md «Graphite»: токены — public/theme.json, элементы и карточки — public/custom.css
 # The CSS file can be served from the public directory or via an external link.
 custom_css = "/public/custom.css"
 
@@ -177,7 +179,8 @@ alert_style = "classic"
 logo_file_url = ""
 
 # Load assistant avatar image directly from URL.
-default_avatar_file_url = ""
+# Знак помощника; по имени автора (/avatars/<имя>) Chainlit не отдаёт кириллицу — отсюда были ответы 400
+default_avatar_file_url = "/public/avatar.svg"
 
 # Avatar size in pixels (default: 20).
 # avatar_size = 20

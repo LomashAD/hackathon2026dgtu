@@ -1,3 +1,384 @@
-/* Локальные системные шрифты: никаких внешних запросов к CDN шрифтов */
-body, .markdown-body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
-.markdown-body table { font-size: 0.9em; }
+/* Оформление чата по DESIGN.md «Graphite — luminous terminal lattice».
+   Цвета, шрифт, размеры, отступы, радиусы и тени — токены из DESIGN.md (раздел Quick Start), без своих значений.
+   Чего в DESIGN.md нет (светлая тема, состояния чата) — доделано в том же стиле, список в docs/frontend_notes.md.
+   Переменные Chainlit (--background, --primary…) заданы в public/theme.json, здесь — элементы интерфейса
+   и карточки сообщений (public/elements/*.jsx). Шрифт Inter (замена matterFont) — локально, public/fonts/. */
+
+:root, :host {
+  /* DESIGN.md → Tokens — Colors */
+  --color-obsidian-canvas: #0a0a0a;
+  --color-true-black: #000000;
+  --color-charcoal-surface: #171717;
+  --color-graphite-edge: #262626;
+  --color-steel-border: #464646;
+  --color-cloud-white: #fafafa;
+  --color-paper-white: #e5e5e5;
+  --color-fog: #a1a1a1;
+  --color-ash: #737373;
+  --color-signal-orange: #ff8833;
+  --gradient-solar-spectrum: linear-gradient(90deg, #ffb931 15%, #ffffff 30%, #ffffff 40%, #2e73fc 50%);
+
+  /* DESIGN.md → Typography */
+  --font-matterfont: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --text-micro-nav: 10px;    --leading-micro-nav: 2;
+  --text-caption: 12px;      --leading-caption: 1.33;
+  --text-nav-control: 14px;  --leading-nav-control: 1.43;
+  --text-body: 16px;         --leading-body: 1.25;
+  --leading-body-relaxed: 1.5;
+  --text-subheading: 20px;   --leading-subheading: 1.4;
+  --text-feature-heading: 24px; --leading-feature-heading: 1.17;
+  --text-section-heading: 36px; --leading-section-heading: 1.11;
+
+  /* DESIGN.md → Spacing, Radius, Shadows */
+  --spacing-8: 8px; --spacing-16: 16px; --spacing-24: 24px; --spacing-32: 32px; --spacing-48: 48px;
+  --radius-md: 4px;
+  --radius-cards: 10px; --radius-pills: 9999px; --radius-badges: 20px; --radius-inputs: 10px; --radius-buttons: 8px;
+  --shadow-sm: rgba(0, 0, 0, 0.25) 0px 4px 4px 0px;
+  --shadow-subtle: rgba(101, 129, 128, 0.15) 0px 0px 2px 2px inset, rgba(32, 47, 46, 0.15) 0px 0px 4px 4px inset;
+  --shadow-subtle-2: rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px;
+  --shadow-md: rgba(0, 0, 0, 0.3) 0px 8px 10px 0px;
+  --shadow-subtle-3: rgb(255, 255, 255) 0px 1px 0px 0px inset, rgba(0, 0, 0, 0.1) 0px -2px 6px 0px inset;
+
+  /* Роли поверхностей (DESIGN.md → Surfaces). Тёмная тема — основная (Theme: dark) */
+  --g-canvas: var(--color-obsidian-canvas);
+  --g-deep: var(--color-true-black);
+  --g-surface: var(--color-charcoal-surface);
+  --g-edge: var(--color-graphite-edge);
+  --g-steel: var(--color-steel-border);
+  --g-text: var(--color-cloud-white);
+  --g-fog: var(--color-fog);
+  --g-ash: var(--color-ash);
+  --g-link: var(--color-signal-orange);
+  --g-pale: var(--color-paper-white);        /* заливка главной кнопки (Pale Conversion Button) */
+  --g-pale-ink: var(--color-charcoal-surface);
+  --g-hairline: rgba(255, 255, 255, 0.1);    /* край прозрачных кнопок (Transparent Navigation Control) */
+  --g-spectrum: var(--gradient-solar-spectrum);
+}
+
+/* Светлая тема — в DESIGN.md не описана; та же палитра в обратном порядке (docs/frontend_notes.md) */
+.light {
+  --g-canvas: #fafafa;
+  --g-deep: #f0f0f0;
+  --g-surface: #ffffff;
+  --g-edge: #e5e5e5;
+  --g-steel: #a1a1a1;
+  --g-text: #0a0a0a;
+  --g-fog: #666666;
+  --g-ash: #737373;
+  --g-link: #b84d00;
+  --g-pale: #171717;
+  --g-pale-ink: #fafafa;
+  --g-hairline: rgba(0, 0, 0, 0.1);
+  --g-spectrum: linear-gradient(90deg, #ffb931 15%, #0a0a0a 30%, #0a0a0a 40%, #2e73fc 50%);
+  --shadow-subtle-3: rgba(255, 255, 255, 0.12) 0px 1px 0px 0px inset, rgba(0, 0, 0, 0.1) 0px -2px 6px 0px inset;
+  /* чёрные тени DESIGN.md на светлом фоне слишком тяжёлые — те же тени, но слабее */
+  --shadow-sm: rgba(0, 0, 0, 0.06) 0px 4px 4px 0px;
+  --shadow-md: rgba(0, 0, 0, 0.12) 0px 8px 10px 0px;
+  --shadow-subtle: rgba(101, 129, 128, 0.06) 0px 0px 2px 2px inset;
+}
+
+/* ------------------------------------------------------------------ основа */
+html, body { background: var(--g-canvas); }
+body, #root, button, input, textarea {
+  font-family: var(--font-matterfont);
+  font-feature-settings: "clig" 0, "liga" 0;
+}
+body { color: var(--g-text); -webkit-font-smoothing: antialiased; }
+::selection { background: var(--g-steel); color: var(--color-cloud-white); }
+:focus-visible { outline: 2px solid var(--g-ash); outline-offset: 2px; }
+
+/* ------------------------------------------------------------------ шапка: Floating Primary Navigation */
+#header {
+  height: 52px;
+  margin: var(--spacing-8) var(--spacing-16) 0;
+  padding: 0 var(--spacing-8);
+  gap: var(--spacing-8);
+  background: var(--g-canvas);
+  border: 1px solid var(--g-edge);
+  border-radius: var(--radius-cards);
+  box-shadow: var(--shadow-sm);
+}
+/* Логотип рядом с кнопкой «Новый чат» — public/logo_dark.svg / logo_light.svg */
+#header > div:first-child { gap: var(--spacing-8); }
+#header > div:first-child::after {
+  content: ""; width: 248px; height: 28px; margin-left: 4px;
+  background: url("/public/logo_dark.svg") left center / auto 100% no-repeat;
+}
+.light #header > div:first-child::after { background-image: url("/public/logo_light.svg"); }
+#header button {
+  font-size: var(--text-nav-control); line-height: var(--leading-nav-control); font-weight: 500;
+  color: var(--g-fog); border-radius: var(--radius-buttons);
+}
+#header button:hover { color: var(--g-text); background: var(--g-surface); }
+/* «О помощнике» — Transparent Navigation Control */
+#readme-button { height: 32px; padding: var(--spacing-8) var(--spacing-16); border: 1px solid var(--g-hairline); }
+#new-chat-button, #theme-toggle { width: 32px; height: 32px; }
+#user-nav-button > span > span { background: var(--g-surface); color: var(--g-text); border: 1px solid var(--g-edge); font-weight: 500; }
+
+/* ------------------------------------------------------------------ сообщения */
+.step .prose, .step .prose * { color: inherit; }
+.message-content .prose {
+  font-size: var(--text-body); line-height: var(--leading-body-relaxed); color: var(--g-text); max-width: none;
+}
+.message-content .prose .font-bold, .message-content .prose strong { font-weight: 600; }
+.message-content .prose .leading-7 { line-height: var(--leading-body-relaxed); }
+.message-content .prose .leading-7:not(:first-child) { margin-top: var(--spacing-16); }
+.message-content .prose em, .message-content .prose .italic { color: var(--g-fog); }
+.message-content .prose ol, .message-content .prose ul { margin: var(--spacing-8) 0 0; }
+.message-content .prose li::marker { color: var(--g-fog); }
+.message-content .prose hr { border: 0; border-top: 1px solid var(--g-edge); margin: var(--spacing-24) 0; }
+.message-content .prose a { color: var(--g-link); text-decoration: none; }
+.message-content .prose a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.message-content .prose code {
+  font-size: 0.875em; background: var(--g-surface); border: 1px solid var(--g-edge);
+  border-radius: var(--radius-md); padding: 1px 6px;
+}
+.message-content .prose table { border: 1px solid var(--g-edge); border-radius: var(--radius-cards); border-collapse: separate; border-spacing: 0; overflow: hidden; font-size: var(--text-nav-control); }
+.message-content .prose th, .message-content .prose td { border-bottom: 1px solid var(--g-edge); padding: var(--spacing-8) 12px; }
+.message-content .prose th { color: var(--g-fog); font-weight: 500; background: var(--g-surface); }
+/* Чек-лист готового черновика: «- [ ]» */
+.message-content .prose input[type="checkbox"] { accent-color: var(--g-pale); margin-right: 6px; }
+
+/* Цитата пункта («Как в документе») — Product Demo Frame */
+.message-content .prose blockquote {
+  margin: var(--spacing-8) 0 0; padding: 12px var(--spacing-16);
+  border: 1px solid var(--g-edge); border-radius: var(--radius-cards);
+  background: var(--g-canvas); box-shadow: var(--shadow-subtle);
+  font-style: normal; color: var(--g-fog);
+}
+.message-content .prose blockquote .leading-7 { color: var(--g-text); }
+
+/* Вопрос пользователя — Charcoal Surface с рамкой Graphite Edge */
+[data-step-type="user_message"] .bg-accent {
+  background: var(--g-surface); border: 1px solid var(--g-edge);
+  border-radius: var(--radius-cards); padding: 12px var(--spacing-16);
+}
+
+/* Аватар помощника */
+.ai-message > span:first-child img { border-radius: 6px; }
+
+/* Шаг «Использовано: Поиск по базе знаний» — подпись Fog */
+[data-step-type="tool"] button[id^="step-"] { font-size: var(--text-nav-control); font-weight: 500; color: var(--g-ash); }
+[data-step-type="tool"] button[id^="step-"]:hover { color: var(--g-fog); }
+
+/* Время ответа «⏱ 0.7 с» — подпись */
+.message-content .prose .leading-7:has(> .italic:only-child) { font-size: var(--text-caption); line-height: var(--leading-caption); }
+.message-content .prose .leading-7:has(> .italic:only-child) .italic { font-style: normal; color: var(--g-ash); filter: grayscale(1); }
+
+/* ------------------------------------------------------------------ кнопки под ответом (id задаёт app/main.py) */
+/* Порядок: варианты ответа, служебные, «копировать», оценка; отступ 8px (DESIGN.md → Element gap) */
+.ai-message .message-content ~ div { margin-left: 0; gap: var(--spacing-8); }
+.ai-message .message-content ~ div > button:not([id]) { order: 2; width: 32px; height: 32px; color: var(--g-fog); }
+.ai-message .message-content ~ div > button[id^="g-util-"] { order: 1; }
+.ai-message .message-content ~ div > button[id^="g-fb-"] { order: 3; }
+.message-content ~ div button, .ai-message button[id^="g-"] {
+  font-size: var(--text-nav-control); line-height: var(--leading-nav-control); font-weight: 500;
+  border-radius: var(--radius-buttons);
+}
+/* Варианты ответа и примеры — Charcoal Secondary Button */
+button[id^="g-quick-"] {
+  height: auto; min-height: 36px; padding: var(--spacing-8) var(--spacing-16);
+  background: var(--g-edge); color: var(--g-text); border: 1px solid var(--g-steel);
+  box-shadow: var(--shadow-subtle-2); white-space: normal; text-align: left;
+}
+.light button[id^="g-quick-"] { background: var(--g-surface); border-color: var(--g-edge); }
+button[id^="g-quick-"]:hover { background: var(--g-steel); color: var(--g-text); }
+.light button[id^="g-quick-"]:hover { background: var(--g-deep); }
+/* Служебные — Transparent Navigation Control */
+button[id^="g-util-"], button[id^="g-fb-"] {
+  height: 32px; padding: var(--spacing-8) 12px;
+  background: transparent; color: var(--g-fog); border: 1px solid var(--g-hairline);
+}
+button[id^="g-util-"] { filter: grayscale(1); }   /* эмодзи 📄 в подписи — моно, как иконки DESIGN.md */
+button[id^="g-fb-"] { width: 32px; padding: 0; }
+button[id^="g-util-"]:hover, button[id^="g-fb-"]:hover { color: var(--g-text); background: var(--g-surface); }
+
+/* ------------------------------------------------------------------ поле ввода */
+#message-composer {
+  background: var(--g-surface); border: 1px solid var(--g-edge); border-radius: var(--radius-inputs);
+  padding: 12px var(--spacing-16) var(--spacing-8); min-height: 0; gap: var(--spacing-8);
+  transition: border-color .15s;
+}
+#message-composer:focus-within { border-color: var(--g-steel); }
+#chat-input { font-size: var(--text-body); line-height: var(--leading-body-relaxed); color: var(--g-text); }
+#chat-input::placeholder { color: var(--g-ash); }
+/* Отправить — Pale Conversion Button */
+#chat-submit {
+  width: 32px; height: 32px; border-radius: var(--radius-buttons);
+  background: var(--g-pale); color: var(--g-pale-ink);
+  border: 1px solid var(--g-hairline); box-shadow: var(--shadow-subtle-3);
+}
+#chat-submit:hover { background: var(--g-pale); opacity: .9; }
+#chat-submit:disabled { opacity: .35; }
+#upload-button, #message-composer button:not(#chat-submit) { border-radius: var(--radius-buttons); color: var(--g-fog); }
+#upload-button:hover, #message-composer button:not(#chat-submit):hover { background: var(--g-edge); color: var(--g-text); }
+.watermark .prose { font-size: var(--text-caption); line-height: var(--leading-caption); color: var(--g-ash); }
+
+/* Вложение в поле ввода */
+#message-composer .rounded-lg { border-radius: var(--radius-buttons); border-color: var(--g-edge); }
+
+/* ------------------------------------------------------------------ диалоги и меню Chainlit */
+[role="dialog"], [role="menu"] {
+  background: var(--g-surface); border: 1px solid var(--g-edge); border-radius: var(--radius-cards);
+  box-shadow: var(--shadow-md);
+}
+[role="dialog"] .prose { color: var(--g-text); }
+[role="menuitem"] { border-radius: var(--radius-buttons); font-size: var(--text-nav-control); }
+
+/* ================================================================== карточки сообщений (public/elements) */
+.inline-custom { width: 100%; }
+/* Chainlit кладёт карточки в отдельную обёртку под текстом и в порядке прихода (отправляются параллельно).
+   Обёртки «растворяются», карточки становятся рядом с текстом, порядок задаётся явно:
+   состояние — над текстом, затем текст, «куда обратиться», источники, файл. */
+.ai-message .message-content { gap: var(--spacing-16); }
+.message-content > div:has(> div > .inline-custom), .message-content > div > div:has(> .inline-custom) { display: contents; }
+.message-content .inline-custom:has(> .g-state) { order: -1; }
+.message-content .inline-custom:has(> .g-contact) { order: 1; }
+.message-content .inline-custom:has(> .g-sources) { order: 2; }
+
+.g-micro {   /* micro-nav: 10px / 700 / межстрочный 2 */
+  font-size: var(--text-micro-nav); line-height: var(--leading-micro-nav); font-weight: 700;
+  letter-spacing: 0; color: var(--g-fog);
+}
+.g-caption { font-size: var(--text-caption); line-height: var(--leading-caption); color: var(--g-fog); }
+.g-card {
+  background: var(--g-canvas); border: 1px solid var(--g-edge); border-radius: var(--radius-cards);
+  padding: var(--spacing-16);
+}
+.g-badge {   /* outlined label chip, радиус badges 20px */
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--text-caption); line-height: var(--leading-caption); color: var(--g-fog);
+  border: 1px solid var(--g-edge); border-radius: var(--radius-badges); padding: 4px 10px;
+}
+.g-badge b { color: var(--g-text); font-weight: 500; }
+.g-link {    /* Inline Orange Link: 16px / 400 / 20px + стрелка */
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--g-link); font-size: var(--text-body); font-weight: 400; line-height: 20px;
+}
+.g-link svg { width: 16px; height: 16px; transition: transform .15s; }
+
+/* ---------- приветствие (Welcome.jsx) */
+.g-welcome {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--g-edge); border-radius: var(--radius-cards);
+  background: var(--g-canvas); box-shadow: var(--shadow-subtle);
+  padding: var(--spacing-32);
+}
+.g-welcome__art { position: absolute; top: -18px; right: -12px; width: 220px; height: 220px; pointer-events: none; opacity: .9; }
+.g-welcome__body { position: relative; max-width: min(520px, calc(100% - 180px)); }
+.g-welcome__title {
+  margin: var(--spacing-16) 0 0; color: var(--g-text);
+  font-size: var(--text-section-heading); line-height: var(--leading-section-heading); font-weight: 500; letter-spacing: -0.5px;
+}
+.g-welcome__lead { margin: var(--spacing-16) 0 0; color: var(--g-fog); font-size: var(--text-body); line-height: var(--leading-body-relaxed); }
+.g-welcome__meta { margin-top: var(--spacing-16); display: flex; flex-wrap: wrap; gap: var(--spacing-8); }
+.g-welcome__label { margin: var(--spacing-32) 0 var(--spacing-8); }
+.g-welcome__grid { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--spacing-8); }
+.g-example {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--spacing-8); text-align: left;
+  cursor: pointer; color: var(--g-text); transition: border-color .15s, background .15s;
+}
+.g-example:hover { border-color: var(--g-steel); background: var(--g-surface); }
+.g-example:hover .g-link svg { transform: translateX(2px); }
+.g-example__icon { width: 20px; height: 20px; color: var(--g-fog); }
+.g-example__text { flex: 1; font-size: var(--text-body); line-height: var(--leading-body); font-weight: 500; }
+.g-welcome__hint { position: relative; margin: var(--spacing-24) 0 0; font-size: var(--text-nav-control); line-height: var(--leading-nav-control); color: var(--g-fog); }
+.g-welcome__hint b { color: var(--g-text); font-weight: 500; }
+
+/* ---------- состояние ответа (State.jsx) */
+.g-state { display: flex; flex-direction: column; gap: var(--spacing-8); }
+.g-state__row { display: flex; align-items: center; gap: var(--spacing-8); }
+.g-state__dot { width: 6px; height: 6px; border-radius: var(--radius-pills); background: var(--g-fog); flex: none; }
+.g-state--fill .g-state__dot, .g-state--ready .g-state__dot { background: var(--g-spectrum); background-size: 300% 100%; background-position: 20% 0; }
+.g-state--refused .g-state__dot { background: var(--g-link); }
+.g-state__count { margin-left: auto; font-size: var(--text-caption); line-height: var(--leading-caption); color: var(--g-fog); font-variant-numeric: tabular-nums; }
+.g-state__title { font-size: var(--text-subheading); line-height: var(--leading-subheading); font-weight: 500; color: var(--g-text); }
+.g-steps { display: flex; gap: 4px; }
+.g-steps > span { flex: 1; height: 4px; border-radius: var(--radius-pills); background: var(--g-edge); }
+.g-steps > span.done { background: var(--g-fog); }
+.g-steps > span.current { background: var(--g-text); }
+.g-state--fill, .g-state--ready, .g-state--review {
+  padding-bottom: var(--spacing-16); border-bottom: 1px solid var(--g-edge);
+}
+
+/* Ответ «нет информации» — весь ответ в рамке */
+.step:has(.g-state--refused) .message-content {
+  border: 1px solid var(--g-edge); border-radius: var(--radius-cards);
+  background: var(--g-canvas); box-shadow: var(--shadow-subtle); padding: var(--spacing-16);
+}
+
+/* ---------- куда обратиться (Contact.jsx) */
+.g-contact { display: flex; gap: 12px; align-items: flex-start; background: var(--g-surface); }
+.g-contact__icon { width: 20px; height: 20px; color: var(--g-text); flex: none; margin-top: 2px; }
+.g-contact__unit { margin-top: 2px; font-size: var(--text-body); line-height: var(--leading-body-relaxed); font-weight: 500; color: var(--g-text); }
+.g-contact .g-caption { margin-top: 4px; }
+
+/* ---------- источники (Sources.jsx) */
+.g-sources__head { display: flex; align-items: baseline; gap: var(--spacing-8); margin-bottom: var(--spacing-8); }
+.g-sources__latency { margin-left: auto; color: var(--g-ash); filter: grayscale(1); }
+.g-sources__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--spacing-8); }
+.g-source { display: grid; grid-template-columns: 24px minmax(0, 1fr) 148px; gap: 12px; align-items: start; }
+.g-source__n {
+  width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--radius-buttons);
+  background: var(--g-surface); border: 1px solid var(--g-edge);
+  font-size: var(--text-caption); font-weight: 500; color: var(--g-fog); font-variant-numeric: tabular-nums;
+}
+.g-source__where { font-size: var(--text-body); line-height: var(--leading-body); font-weight: 500; color: var(--g-text); }
+.g-source__doc { margin-top: 4px; font-size: var(--text-nav-control); line-height: var(--leading-nav-control); color: var(--g-fog); }
+.g-source__head { margin-top: 2px; font-size: var(--text-caption); line-height: var(--leading-caption); color: var(--g-ash); }
+.g-source .g-badge { margin-left: var(--spacing-8); vertical-align: 2px; }
+.g-badge--archived { color: var(--g-link); border-color: currentColor; }
+.g-rel { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 6px var(--spacing-8); white-space: nowrap; }
+.g-rel__label { font-size: var(--text-caption); line-height: var(--leading-caption); color: var(--g-fog); }
+.g-rel__value { font-size: var(--text-nav-control); font-weight: 500; color: var(--g-text); font-variant-numeric: tabular-nums; }
+.g-rel__bar { grid-column: 1 / -1; height: 4px; border-radius: var(--radius-pills); background: var(--g-edge); overflow: hidden; }
+.g-rel__bar > span { display: block; height: 100%; border-radius: inherit; background: var(--g-text); }
+.g-rel--none .g-rel__value { color: var(--g-ash); font-weight: 400; }
+
+/* ---------- готовый черновик: файл .docx (элемент File Chainlit) — карточка с кнопкой «Скачать» (Pale Conversion Button) */
+.message-content div:has(> div > a.inline-file), .message-content div:has(> a.inline-file) { width: 100%; }
+.message-content a.inline-file { display: block; width: 100%; text-decoration: none; }
+.message-content a.inline-file > div { height: auto; }
+.message-content a.inline-file .bg-card {
+  max-width: none; min-height: 64px; padding: 12px 12px 12px var(--spacing-16); gap: 12px;
+  background: var(--g-surface); color: var(--g-text); border: 1px solid var(--g-edge); border-radius: var(--radius-cards);
+  box-shadow: var(--shadow-subtle); transition: border-color .15s;
+}
+.message-content a.inline-file:hover .bg-card { border-color: var(--g-steel); }
+.message-content a.inline-file .bg-card > div:first-child { width: 32px; flex: none; color: var(--g-fog); }
+.message-content a.inline-file .bg-card > span { width: auto; flex: 1; min-width: 0; font-size: var(--text-nav-control); font-weight: 500; }
+.message-content a.inline-file .bg-card::after {
+  content: "Скачать .docx"; flex: none; white-space: nowrap;
+  padding: var(--spacing-8) var(--spacing-16); border-radius: var(--radius-buttons);
+  background: var(--g-pale); color: var(--g-pale-ink); border: 1px solid var(--g-hairline); box-shadow: var(--shadow-subtle-3);
+  font-size: var(--text-nav-control); line-height: var(--leading-nav-control); font-weight: 500;
+}
+
+/* Кнопка «вниз» над полем ввода — Dark Pill Icon Button */
+#root button.rounded-full.border-input:not([id]) {
+  width: 32px; height: 32px; background: var(--g-surface); color: var(--g-text);
+  border: 1px solid var(--g-edge); box-shadow: var(--shadow-sm);
+}
+
+/* ================================================================== телефоны */
+@media (max-width: 640px) {
+  #header { margin: var(--spacing-8) var(--spacing-8) 0; height: 48px; }
+  #header > div:first-child::after { width: 28px; background-size: auto 100%; background-image: url("/public/favicon.svg"); border-radius: 6px; }
+  .light #header > div:first-child::after { background-image: url("/public/favicon.svg"); }
+  #readme-button { padding: var(--spacing-8); }
+  .g-welcome { padding: var(--spacing-24) var(--spacing-16); }
+  .g-welcome__art { width: 112px; height: 112px; top: -16px; right: -20px; opacity: .6; }
+  .g-welcome__body { max-width: none; }
+  .g-welcome__title { padding-right: 56px; }
+  .g-welcome__title { font-size: var(--text-feature-heading); line-height: var(--leading-feature-heading); font-weight: 600; letter-spacing: 0; }
+  .g-welcome__grid { grid-template-columns: 1fr; }
+  .g-source { grid-template-columns: 24px minmax(0, 1fr); }
+  .g-rel { grid-column: 2; }
+  .message-content a.inline-file .bg-card { flex-wrap: wrap; }
+  .message-content a.inline-file .bg-card::after { content: "Скачать"; }
+  [data-step-type="user_message"] .bg-accent { max-width: 85%; }
+  /* аватар помощника на узком экране не показываем — вся ширина под текст */
+  .ai-message { gap: 0; }
+  .ai-message > span:first-child { display: none; }
+  #message-composer { border-radius: var(--radius-inputs); }
+}

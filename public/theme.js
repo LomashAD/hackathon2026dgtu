@@ -1,15 +1,16 @@
-// Тема чата: по умолчанию как в системе; кнопка в шапке (солнце — светлая, полумесяц — тёмная) переключает
-// тему одним нажатием вместо меню Chainlit. Выбор хранится под ключом Chainlit «vite-ui-theme» — он общий
-// с порталом (тот же адрес), поэтому чат во всплывающем окне меняет тему вместе с порталом и наоборот.
+// Тема чата: по умолчанию тёмная (DESIGN.md «Graphite»: Theme: dark); кнопка в шапке (солнце — светлая,
+// полумесяц — тёмная) переключает тему одним нажатием вместо меню Chainlit. Выбор хранится под ключом Chainlit
+// «vite-ui-theme» — он общий с порталом (тот же адрес), поэтому чат во всплывающем окне меняет тему вместе
+// с порталом и наоборот.
 (() => {
   const KEY = 'vite-ui-theme', dark = matchMedia('(prefers-color-scheme: dark)');
   const sys = () => (dark.matches ? 'dark' : 'light');
   const current = () => (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
   const saved = () => { try { return localStorage.getItem(KEY); } catch (e) { return null; } };
 
-  // У Chainlit по умолчанию тёмная тема (default_theme = "dark", «system» в конфиге не задать). Скрипт
-  // выполняется раньше бандла Chainlit, поэтому, пока тему не выбирали, записываем «как в системе».
-  if (saved() === null) try { localStorage.setItem(KEY, 'system'); } catch (e) { /* нет хранилища */ }
+  // Скрипт выполняется раньше бандла Chainlit. Пока тему не выбирали кнопкой — тёмная; прежнее значение
+  // «как в системе» (его записывала старая версия скрипта) тоже считается невыбранной темой.
+  if (saved() !== 'light' && saved() !== 'dark') try { localStorage.setItem(KEY, 'dark'); } catch (e) { /* нет хранилища */ }
 
   // Провайдер темы Chainlit (React-контекст с setTheme): через него меняется и состояние приложения
   // (логотип, уведомления), а не только класс на <html>.
@@ -48,17 +49,15 @@
     const b = toggleBtn(e);
     if (!b) return;
     e.stopPropagation();
-    const next = current() === 'dark' ? 'light' : 'dark';
-    apply(next === sys() ? 'system' : next);   // вернулись к теме системы — снова следуем за ней
+    apply(current() === 'dark' ? 'light' : 'dark');
     label(b);
   }, true);
   document.addEventListener('mouseover', e => { const b = toggleBtn(e); if (b) label(b); }, true);
 
   // Тему переключили на портале (или в другой вкладке) — применяем здесь.
   window.addEventListener('storage', e => {
-    if (e.key === KEY) apply(e.newValue === 'light' || e.newValue === 'dark' ? e.newValue : 'system');
+    if (e.key === KEY) apply(e.newValue === 'light' ? 'light' : 'dark');
   });
-  dark.addEventListener('change', () => { const v = saved(); if (v !== 'light' && v !== 'dark') apply('system'); });
 })();
 
 // Чат в окне виджета (iframe): Esc закрывает окно. Нажатия внутри iframe странице портала не видны,
