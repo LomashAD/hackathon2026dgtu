@@ -24,7 +24,7 @@ from playwright.async_api import async_playwright
 
 SHOTS = Path(__file__).resolve().parent.parent / "docs" / "screenshots"
 PHONES = [(360, 740), (375, 812), (390, 844), (414, 896), (740, 360), (844, 390)]   # портрет и ландшафт
-LOCAL = re.compile(r"^(https?|wss?)://(localhost|127\.0\.0\.1)|^(data|blob):")
+LOCAL = re.compile(r"^(https?|wss?)://(localhost|127\.0\.0\.1)|^(data|blob):")   # и адрес из --url (стенд)
 
 
 def check(ok: bool, what: str, failures: list) -> None:
@@ -77,7 +77,10 @@ async def wait_closed(page):
 
 
 async def main(url: str, login_name: str, password: str, admin: str, admin_password: str, shots: bool) -> int:
+    global LOCAL
     failures, external = [], []
+    host = re.escape(url.split("://", 1)[-1].split("/", 1)[0])
+    LOCAL = re.compile(rf"^(https?|wss?)://(localhost|127\.0\.0\.1|{host})|^(data|blob):")
     async with async_playwright() as p:
         browser = await p.chromium.launch(channel="chrome")
         ctx = await browser.new_context(viewport={"width": 390, "height": 844}, locale="ru-RU")
