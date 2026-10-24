@@ -382,3 +382,8 @@ button[id^="g-util-"]:hover, button[id^="g-fb-"]:hover { color: var(--g-text); b
   .ai-message > span:first-child { display: none; }
   #message-composer { border-radius: var(--radius-inputs); }
 }
+
+/* «О помощнике» (chainlit.md): заголовки по шкале DESIGN.md — 36/500 и 24/600, не тяжелее 600 */
+[role="dialog"] .prose h1 { font-size: var(--text-section-heading); line-height: var(--leading-section-heading); font-weight: 500; letter-spacing: -0.5px; }
+[role="dialog"] .prose h2 { font-size: var(--text-feature-heading); line-height: var(--leading-feature-heading); font-weight: 600; border-color: var(--g-edge); }
+[role="dialog"] .prose strong, [role="dialog"] .prose .font-bold { font-weight: 600; }
