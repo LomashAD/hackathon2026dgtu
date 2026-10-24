@@ -9,20 +9,22 @@
 ```mermaid
 flowchart LR
   subgraph Client["Браузер сотрудника"]
-    UI["Чат Chainlit<br/>роль · источники · .docx"]
-    W["Поп-ап виджет на портале<br/>(/widget, iframe)"]
+    UI["Чат Chainlit (/?chat)<br/>источники · .docx"]
+    W["Портал (/): поп-ап виджет<br/>(iframe → /?chat), админ-панель"]
+    LG["Вход (/login)"]
   end
 
   subgraph App["Сервис app (Python, один процесс, порт 8000)"]
     CH["Chainlit UI-слой<br/>app/main.py"]
-    API["FastAPI<br/>/api/ask · /api/health · /api/kb/versions"]
+    API["FastAPI<br/>/api/ask · /api/kb/* · /api/news · /api/me"]
+    ADM["API админ-панели<br/>app/admin_api.py · /api/admin/*"]
     ENG["Движок диалога<br/>app/dialog/engine.py"]
     INT["Классификатор намерений<br/>(правила → LLM как запасной)"]
     RET["Гибридный поиск<br/>вектор + BM25, % релевантности,<br/>порог, связанные пункты"]
     APR["Матрица визирования<br/>и сроки (код)"]
     TPL["Шаблоны: подбор, слоты,<br/>docxtpl → .docx"]
     REV["Проверка черновика<br/>(правила)"]
-    SEC["Безопасность: фильтр доступа,<br/>маскирование ПДн, аудит"]
+    SEC["Безопасность: учётные записи и роли,<br/>фильтр доступа, маскирование ПДн, аудит"]
     GRD["Проверка ответа модели<br/>app/llm/guard.py"]
   end
 
@@ -31,9 +33,11 @@ flowchart LR
     REG[("registry.json<br/>версии документов")]
     MTX[("matrix.json<br/>Матрица по версиям")]
     LOG[("logs/*.jsonl<br/>аудит · без ответа · отзывы")]
+    USR[("users.json<br/>учётные записи, хеши паролей")]
+    NWS[("news.yaml<br/>новости портала")]
   end
 
-  subgraph LLM["Ollama (локально, GPU)"]
+  subgraph LLM["Ollama (локально: GPU на Mac, CPU на сервере)"]
     Q["qwen2.5:1.5b-instruct"]
     E["bge-m3 (эмбеддинги)"]
   end
@@ -41,9 +45,15 @@ flowchart LR
   DATA[["data/ + config.yaml<br/>Инструкция PDF, Матрица,<br/>метод. рекомендации, модули"]]
   ING["scripts/ingest.py<br/>парсинг → чанки → индекс → версии"]
 
+  LG --> SEC
   UI --> CH --> ENG
   W --> CH
-  API --> ENG
+  W --> API --> ENG
+  W --> ADM
+  ADM --> USR
+  ADM --> NWS
+  ADM -. "новая редакция<br/>(фоновая задача)" .-> ING
+  SEC --> USR
   ENG --> INT
   ENG --> RET --> CHR
   RET --> E
@@ -64,20 +74,36 @@ flowchart LR
 
 | Модуль | Назначение | Технологии |
 |---|---|---|
-| `app/main.py` | Веб-интерфейс: профили-роли, кнопки быстрых ответов и уточнений, источники в боковой панели, загрузка черновика, скачивание .docx, 👍/👎 | Chainlit 2.12 |
-| `app/api.py` | REST API ядра, страница-макет портала с виджетом, middleware, вырезающий внешние CDN-ссылки | FastAPI |
+| `app/main.py` | Веб-интерфейс чата: вход по учётной записи (роль берётся из неё), кнопки быстрых ответов и уточнений, источники в боковой панели, загрузка черновика, скачивание .docx, 👍/👎, поиск по архиву для администратора | Chainlit 2.12 |
+| `app/api.py` | REST API ядра (`/api/ask`, `/api/kb/*`, `/api/news`, `/api/me`), страницы входа и портала, middleware, вырезающий внешние CDN-ссылки | FastAPI |
+| `app/admin_api.py` | API админ-панели, только администратору: учётные записи, журнал действий, вопросы без ответа и оценки, новости, загрузка и смена редакций, статус системы | FastAPI |
+| `app/news.py` | Лента новостей портала: `storage/news.yaml` и автоматические новости о новых редакциях из реестра версий | PyYAML |
+| `public/` | Портал с поп-ап виджетом и админ-панелью (`portal_widget.html`), страница входа, тема портала и чата (`theme.js`) | HTML, JS |
 | `app/dialog/` | Намерения (вопрос, найти пункт, создать документ, проверить документ, согласование, сроки, куда обратиться). Состояние сессии: роль, история, выбранные параметры, ожидаемое уточнение, заполняемый шаблон | Python, regex |
-| `app/ingest/` | Парсинг PDF (с фильтром водяного знака) и DOCX, чанкинг по пунктам, извлечение отсылок `refs`, индексация, реестр версий, дифф пунктов | pdfplumber, python-docx, Chroma |
+| `app/ingest/` | Парсинг PDF (с фильтром водяного знака) и DOCX, чанкинг по пунктам, извлечение отсылок `refs`, индексация, реестр версий, дифф пунктов, фоновая загрузка редакции из админ-панели (`jobs.py`) | pdfplumber, python-docx, Chroma |
 | `app/retrieval/` | Гибридный поиск: косинус bge-m3 + BM25, калиброванный %, порог, подтягивание связанных пунктов | Chroma, собственный BM25 |
 | `app/llm/` | Клиент Ollama, короткие промпты с одним примером, проверка ответа модели | httpx, Ollama |
 | `app/approval/` | Матрица визирования (строка, согласующие, условия), сроки по п. 10.3 и 6.6 | JSON |
 | `app/templates/` | YAML-каталог шаблонов, подбор, вопросы и валидация полей, сборка docxtpl-шаблона из исходного модуля, рендер | docxtpl, Jinja2 |
 | `app/review/` | Проверка загруженного .docx/.pdf: реквизиты, служебные элементы модуля, оформление | python-docx, pdfplumber |
-| `app/security/` | Роли и уровни доступа, условие `where` для индекса, маскирование ПДн, аудит-лог | — |
+| `app/security/` | Учётные записи и вход (хеши PBKDF2, блокировка после неудачных попыток, роль из учётной записи на каждом запросе), уровни доступа, условие `where` для индекса, маскирование ПДн, аудит-лог | — |
 
 ## Стек
 
-Python 3.12, FastAPI, Chainlit, Ollama (`qwen2.5:1.5b-instruct`, `bge-m3`), Chroma (персистентный), собственный BM25, pdfplumber, python-docx, docxtpl, PyYAML. Все компоненты open source. Запуск: `./run.sh` (нативная Ollama с GPU) или `docker compose up` (сервисы `app` и `ollama`).
+Python 3.12, FastAPI, Chainlit, Ollama (`qwen2.5:1.5b-instruct`, `bge-m3`), Chroma (персистентный), собственный BM25, pdfplumber, python-docx, docxtpl, PyYAML. Все компоненты open source. Запуск: `./run.sh` (нативная Ollama, на Mac с GPU). `docker-compose.yml` (сервисы `app` и `ollama`) написан, но не проверялся: Docker нет ни на машине разработки, ни на сервере.
+
+## Развёртывание демо-стенда
+
+Одна машина Ubuntu, 2 vCPU, без GPU (https://217-144-184-227.sslip.io):
+
+```mermaid
+flowchart LR
+  B["Браузер"] -- "HTTPS 443" --> C["Caddy<br/>TLS Let's Encrypt,<br/>Secure-cookie, frame-ancestors 'self'"]
+  C -- "127.0.0.1:8000" --> A["dou-assistant (systemd)<br/>run.sh от пользователя dou"]
+  A -- "127.0.0.1:11434" --> O["ollama (systemd)<br/>qwen2.5 1.5B · bge-m3"]
+```
+
+Межсетевой экран пропускает только 22/80/443. Приложение и Ollama слушают только локальный адрес. Исходящих соединений у них нет ([security.md](security.md)).
 
 ## Поток обработки сообщения
 
