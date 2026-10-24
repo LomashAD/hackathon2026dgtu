@@ -87,6 +87,12 @@ async def main(url: str) -> int:
         await page.wait_for_timeout(1500)
         chat = Chat(page)
 
+        print("0. Приветствие и /help")
+        body = await page.inner_text("body")
+        check("Роль: Сотрудник" in body and "/help" in body and "Умею" not in body, "приветствие: роль и подсказка /help", failures)
+        body = await chat.say("/help")
+        check("Отвечать на вопросы" in body and "Проверять загруженный черновик" in body, "/help показывает, что умеет помощник", failures)
+
         print("1–3. Вопрос своими словами → положения с % релевантности → ответ простым языком со ссылками")
         body = await chat.say("Мне поручили собрать рабочую группу для подготовки регламента. Каким документом это оформляется?")
         check("релевантность" in body and "п. 9.7.1" in body, "найден п. 9.7.1 с процентом релевантности", failures)

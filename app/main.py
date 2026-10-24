@@ -55,7 +55,9 @@ async def start():
     cl.user_session.set("session", s)
     if can_view_archive(role):
         await cl.ChatSettings([Switch(id="archive", label="Искать также в архивных редакциях", initial=False)]).send()
-    await _send(get_engine().help(), greeting=f"Роль: **{roles()[role]['title']}**.\n\n")
+    # Справка — по команде /help (обычный текст, его распознаёт классификатор намерений). Команды Chainlit
+    # (set_commands) не подходят: Enter после «/help» только выбирает команду, а не отправляет сообщение.
+    await cl.Message(content=f"Роль: **{roles()[role]['title']}**.\n\nЧто я умею — команда **/help**.").send()
 
 
 @cl.on_settings_update
@@ -64,9 +66,9 @@ async def settings_update(settings):
     s.include_archived = bool(settings.get("archive"))
 
 
-async def _send(reply: Reply, greeting: str = "") -> None:
+async def _send(reply: Reply) -> None:
     elements = []
-    text = greeting + reply.text
+    text = reply.text
     actions = [cl.Action(name="quick", payload={"text": payload}, label=label) for label, payload in reply.actions]
     if reply.sources:
         lines = ["", "**Источники:**"]
