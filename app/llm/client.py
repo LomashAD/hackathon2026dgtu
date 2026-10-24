@@ -19,6 +19,7 @@ class OllamaClient:
         self.temperature = cfg["llm"].get("temperature", 0)
         self.num_ctx = cfg["llm"].get("num_ctx", 4096)
         self.timeout = cfg["llm"].get("timeout_s", 120)
+        self.wait = cfg["llm"].get("wait_s", self.timeout)   # чат в диалоге необязателен: у каждого вызова есть запасной путь
         self.embed_model = cfg["embeddings"]["model"]
         self.batch = cfg["embeddings"].get("batch_size", 16)
         self._http = httpx.Client(timeout=self.timeout)
@@ -31,7 +32,7 @@ class OllamaClient:
         r = self._http.post(f"{self.base}/api/chat", json={
             "model": self.model, "messages": messages, "stream": False, "options": opts,
             "keep_alive": "30m",
-        })
+        }, timeout=self.wait)
         r.raise_for_status()
         out = r.json()["message"]["content"].strip()
         log.info("llm chat %.2fs, %d chars", time.perf_counter() - t0, len(out))

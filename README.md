@@ -105,9 +105,9 @@ cp .env.example .env                      # при необходимости п
 ## Тесты
 
 ```bash
-.venv/bin/pytest -q                 # 26 юнит- и интеграционных тестов (парсинг, матрица, сроки, шаблоны, доступ, версии)
+.venv/bin/pytest -q                 # 34 юнит- и интеграционных теста (парсинг, матрица, сроки, шаблоны, доступ, версии)
 .venv/bin/python tests/run_eval.py  # метрики качества и скорости
-./scripts/check_egress.sh           # сетевые соединения процесса приложения (только localhost)
+PASSWORD=<пароль> ./scripts/check_egress.sh   # сетевые соединения процесса приложения (только localhost)
 # сквозной UI-сценарий (dev-зависимость: pip install playwright, нужен Google Chrome):
 python tests/ui_demo.py
 ```

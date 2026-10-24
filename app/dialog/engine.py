@@ -494,6 +494,7 @@ class Engine:
                 out = cand
         except Exception as e:  # noqa: BLE001
             log.warning("LLM-перефразирование недоступно: %s", e)
+            return out   # не кэшируем: модель могла быть занята, в следующий раз попробуем снова
         cache[question] = out
         return out
 

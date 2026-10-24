@@ -22,6 +22,7 @@ from app.security.session import account, account_from_request, issue_cookie, lo
 
 router = APIRouter()
 _sessions: dict[str, Session] = {}
+_MAX_SESSIONS = 1000                 # сессии /api/ask в памяти: самые старые вытесняются
 _LOCAL = re.compile(r"/(?![/\\])\S*")   # куда можно вернуться после входа: только свой адрес
 
 
@@ -52,6 +53,8 @@ def ask(body: AskIn, acc: dict = Depends(account)):
     if s is None or s.user != acc["login"]:
         s = Session(role=acc["role"], user=acc["login"])
         _sessions[s.id] = s
+        while len(_sessions) > _MAX_SESSIONS:
+            _sessions.pop(next(iter(_sessions)))
     s.role = acc["role"]
     r = get_engine().handle(s, body.text)
     return {"session_id": s.id, "intent": r.intent, "refused": r.refused, "text": r.text,

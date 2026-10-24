@@ -19,8 +19,9 @@ persist_user_env = false
 # Set to true to show API keys as ***, false to show them as plain text
 mask_user_env = false
 
-# Authorized origins
-allow_origins = ["*"]
+# Authorized origins. Портал, виджет и чат работают с одного адреса, поэтому чужим сайтам
+# чтение ответов API запрещено. Если портал на другом адресе вызывает /api/* из браузера, добавьте его сюда
+allow_origins = []
 
 [features]
 # Process and display HTML in messages. This can be a security risk (see https://stackoverflow.com/questions/19603097/why-is-it-dangerous-to-render-user-generated-html-or-javascript)

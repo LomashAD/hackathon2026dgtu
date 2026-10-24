@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
 # Проверка: процесс приложения не устанавливает соединений с внешними хостами.
-# Делает несколько запросов к API и выводит все сетевые соединения процесса (должны быть только localhost).
+# Входит под учётной записью, задаёт несколько вопросов через API и выводит все сетевые соединения процесса
+# (должны быть только localhost).
+#   PASSWORD=<пароль> [LOGIN=sotrudnik] ./scripts/check_egress.sh
 set -euo pipefail
 PORT="${PORT:-8000}"
-PID=$(pgrep -f "chainlit run app/main.py" | head -1)
+LOGIN="${LOGIN:-sotrudnik}"
+PASSWORD="${PASSWORD:?укажите PASSWORD=<пароль учётной записи $LOGIN>}"
+PID=$(pgrep -f "chainlit run app/main.py" | head -1 || true)
 [ -z "$PID" ] && { echo "приложение не запущено"; exit 1; }
+JAR=$(mktemp); trap 'rm -f "$JAR"' EXIT
+code=$(curl -s -c "$JAR" -X POST "localhost:$PORT/login" -d "username=$LOGIN&password=$PASSWORD" -o /dev/null -w "%{http_code}")
+[ "$code" = 200 ] || { echo "вход не удался (HTTP $code)"; exit 1; }
 for q in "Когда регистрировать входящий документ?" "Кто визирует распоряжение о создании рабочей группы?" "Как приготовить борщ?"; do
-  curl -s -X POST "localhost:$PORT/api/ask" -H 'Content-Type: application/json' -d "{\"text\":\"$q\"}" >/dev/null &
+  curl -s -b "$JAR" -X POST "localhost:$PORT/api/ask" -H 'Content-Type: application/json' -d "{\"text\":\"$q\"}" >/dev/null &
 done
 sleep 0.5
 CONN=$(lsof -nP -a -p "$PID" -i 2>/dev/null | awk 'NR>1{print $9}' | sort -u)
