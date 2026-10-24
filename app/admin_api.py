@@ -271,7 +271,8 @@ async def kb_add(title: str = Form(...), short_title: str = Form(""), access_lev
                  version: str = Form("1.0"), effective_date: str = Form(...), file: UploadFile = File(...),
                  acc: dict = Depends(admin)):
     """Новый документ базы знаний без правки config.yaml и кода: регламент, памятка, положение (.docx, .pdf,
-    .txt, .md). Структура определяется по содержимому (парсер auto), индексация — в фоне."""
+    .txt, .md) или таблица — реестр, справочник (.xlsx, .csv). Структура определяется по содержимому (парсер auto),
+    индексация — в фоне."""
     title, short = " ".join(title.split()), " ".join(short_title.split())
     if not 3 <= len(title) <= 200:
         raise HTTPException(400, "Название — от 3 до 200 символов")

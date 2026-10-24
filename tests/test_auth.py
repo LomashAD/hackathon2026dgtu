@@ -308,7 +308,7 @@ def test_admin_adds_and_disables_documents(users, tmp_path, monkeypatch):
             "access_level": "confidential", "version": "1.0", "effective_date": "2027-01-01"}
     docx = {"file": ("reg.docx", b"PK fake docx", "application/octet-stream")}
     assert emp.post("/api/admin/kb/add", data=form, files=docx).status_code == 403
-    assert adm.post("/api/admin/kb/add", data=form, files={"file": ("x.xlsx", b"PK", "application/octet-stream")}).status_code == 400
+    assert adm.post("/api/admin/kb/add", data=form, files={"file": ("x.pptx", b"PK", "application/octet-stream")}).status_code == 400
     assert adm.post("/api/admin/kb/add", data=form | {"access_level": "top"}, files=docx).status_code == 400
     assert adm.post("/api/admin/kb/add", data=form | {"effective_date": "01.01.2027"}, files=docx).status_code == 400
     assert adm.post("/api/admin/kb/add", data=form, files={"file": ("reg.docx", b"", "application/octet-stream")}).status_code == 400

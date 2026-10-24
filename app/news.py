@@ -21,6 +21,7 @@ from app.ingest.indexer import load_registry
 log = logging.getLogger(__name__)
 _FIELDS = ("date", "unit", "title", "text", "ask", "ask_label", "link", "link_label", "open_chat")
 _SECTION = re.compile(r"\d+(\.\d+)*")
+_ROW = re.compile(r"стр\. \d+$")   # строка таблицы: «стр. 5», «лист «Дела», стр. 5»
 _LOCAL_LINK = re.compile(r"#\S*|/(?![/\\])\S*")  # «//host» и «/\host» браузер считает внешним адресом
 _lock = threading.Lock()
 
@@ -166,7 +167,8 @@ def edition_news(reg: dict | None = None, role: str | None = None) -> list[dict]
         for i, v in enumerate(sorted(d["versions"], key=lambda x: x.get("ingested_at", ""))):
             diff = v.get("diff_from_previous")
             if diff is None and i == 0 and doc_id not in configured:
-                now = ("Помощник уже отвечает по нему." if v.get("status") == "active"
+                # действует любая редакция — документ не отключён, даже если первая уже в архиве
+                now = ("Помощник уже отвечает по нему." if any(x.get("status") == "active" for x in d["versions"])
                        else "Сейчас документ отключён.")
                 out.append({
                     "date": v["ingested_at"][:10], "unit": "База знаний помощника", "auto": True,
@@ -180,7 +182,9 @@ def edition_news(reg: dict | None = None, role: str | None = None) -> list[dict]
             parts = [f"{label}: {len(diff[k])} ({_sections(diff[k])})"
                      for k, label in (("changed", "изменено"), ("added", "добавлено"), ("removed", "исключено"))
                      if diff[k]]
-            changes = "Пункты: " + "; ".join(parts) + "." if parts else "Текст пунктов не изменился."
+            rows = parts and all(_ROW.search(k) for x in diff.values() for k in x)
+            changes = ("Строки таблицы: " if rows else "Пункты: ") + "; ".join(parts) + "." if parts \
+                else "Текст пунктов не изменился."
             now = ("Помощник уже отвечает по этой редакции." if v.get("status") == "active"
                    else "Сейчас эта редакция в архиве.")
             out.append({

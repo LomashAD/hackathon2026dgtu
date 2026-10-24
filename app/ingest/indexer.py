@@ -161,7 +161,7 @@ def ingest(source: dict, file: Path | None = None, version: str | None = None,
         mpath.write_text(json.dumps(all_m, ensure_ascii=False, indent=2), encoding="utf-8")
 
     return {"doc_id": doc_id, "version": version, "sections": len(sections), "chunks": len(chunks),
-            "archived_versions": archived, "diff": diff}
+            "rows": sum(s["kind"] == "row" for s in sections), "archived_versions": archived, "diff": diff}
 
 
 def ingest_all(force: bool = False) -> list[dict]:

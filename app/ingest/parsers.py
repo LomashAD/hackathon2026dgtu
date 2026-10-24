@@ -2,10 +2,13 @@
 
 Каждый парсер возвращает список секций:
     {"section_path": "5.4.1", "chapter": "5", "chapter_title": "...",
-     "appendix": "" | "1", "text": "...", "kind": "point" | "appendix" | "preamble" | "fragment"}
+     "appendix": "" | "1", "text": "...", "kind": "point" | "appendix" | "preamble" | "fragment" | "row"}
 """
 from __future__ import annotations
 
+import csv
+import datetime as dt
+import io
 import re
 from pathlib import Path
 
@@ -244,7 +247,8 @@ def matrix_sections(matrix: dict) -> list[dict]:
 
 # ---------------------------------------------------------------- произвольный документ
 
-PLAIN_EXT = (".docx", ".pdf", ".txt", ".md")
+TABLE_EXT = (".xlsx", ".csv")
+PLAIN_EXT = (".docx", ".pdf", ".txt", ".md") + TABLE_EXT
 _HEADING_STYLE = re.compile(r"^(heading|заголовок|title|название)", re.I)
 _FRAGMENT_CHARS = 900
 
@@ -298,7 +302,9 @@ def _plain_blocks(path: Path) -> list[tuple[str, bool]]:
 
 def parse_plain(path: Path) -> list[dict]:
     """Любой документ: пункты «N.M.» — как пункты, остальной текст — фрагменты до ~900 символов
-    в пределах раздела (заголовка). Для регламентов и памяток без строгой нумерации."""
+    в пределах раздела (заголовка). Для регламентов и памяток без строгой нумерации. Таблица — parse_table."""
+    if path.suffix.lower() in TABLE_EXT:
+        return parse_table(path)
     sections: list[dict] = []
     heading, buf, n, point = "", [], 0, None
 
@@ -330,6 +336,96 @@ def parse_plain(path: Path) -> list[dict]:
     return sections
 
 
+# ---------------------------------------------------------------- таблица: реестр, справочник, журнал
+
+TABLE_MAX_ROWS = 5000   # строк данных во всех листах: эмбеддинги на сервере без GPU — около 5 строк в секунду
+
+
+def _cell_text(v) -> str:
+    """Значение ячейки так, как его видит человек: дата — ДД.ММ.ГГГГ, целое — без «.0», дробь — с запятой."""
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return "да" if v else "нет"
+    if isinstance(v, dt.datetime):
+        return v.strftime("%d.%m.%Y %H:%M") if (v.hour, v.minute) != (0, 0) else v.strftime("%d.%m.%Y")
+    if isinstance(v, dt.date):
+        return v.strftime("%d.%m.%Y")
+    if isinstance(v, dt.time):
+        return v.strftime("%H:%M")
+    if isinstance(v, float):
+        return str(int(v)) if v.is_integer() else f"{v:.15g}".replace(".", ",")
+    return " ".join(str(v).split())
+
+
+def _csv_text(path: Path) -> str:
+    raw = path.read_bytes()
+    for enc in ("utf-8-sig", "cp1251"):   # cp1251 — CSV из русского Excel
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
+def _table_sheets(path: Path) -> list[tuple[str, list[list[str]]]]:
+    """Листы таблицы: (название, строки ячеек с первой строки и первого столбца). CSV — один лист без названия."""
+    if path.suffix.lower() == ".csv":
+        text = _csv_text(path)
+        try:
+            dialect = csv.Sniffer().sniff(text[:20000], delimiters=";,\t|")
+        except csv.Error:
+            dialect = csv.excel
+        return [("", [[_cell_text(c) for c in row] for row in csv.reader(io.StringIO(text), dialect)])]
+    import openpyxl
+
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)   # data_only — значения формул, а не формулы
+    try:
+        sheets = []
+        for ws in wb.worksheets:
+            if ws.sheet_state != "visible":
+                continue
+            ws.reset_dimensions()   # размер листа в файле бывает неверным — тогда read_only обрезал бы строки
+            sheets.append((ws.title, [[_cell_text(c) for c in row]
+                                      for row in ws.iter_rows(min_row=1, min_col=1, values_only=True)]))
+        return sheets
+    finally:
+        wb.close()
+
+
+def parse_table(path: Path) -> list[dict]:
+    """Таблица .xlsx/.csv: строка = секция «Столбец: значение» (заголовки — из строки шапки). Номер строки — как
+    в Excel, чтобы ссылку можно было найти в файле. Строки над шапкой (название таблицы) — заголовок раздела."""
+    found: list[tuple[str, str, list[tuple[int, str]]]] = []
+    total = 0
+    for title, rows in _table_sheets(path):
+        filled = [(i + 1, row) for i, row in enumerate(rows) if any(row)]
+        if not filled:
+            continue
+        counts = [sum(bool(c) for c in row) for _, row in filled[:20]]
+        widest = max(counts)
+        need = max(2, round(0.6 * widest)) if widest >= 2 else 1
+        h = next(k for k, n in enumerate(counts) if n >= need)
+        caption = " ".join(c for _, row in filled[:h] for c in row if c)
+        header = filled[h][1]
+        names = [c or f"Столбец {j + 1}" for j, c in enumerate(header)]
+        out = []
+        for n, row in filled[h + 1:]:
+            if row == header:   # шапка, повторённая на каждой печатной странице
+                continue
+            cells = [f"{names[j] if j < len(names) else f'Столбец {j + 1}'}: {c}" for j, c in enumerate(row) if c]
+            out.append((n, "\n".join(cells)))
+        total += len(out)
+        if total > TABLE_MAX_ROWS:
+            raise ValueError(f"В таблице больше {TABLE_MAX_ROWS} строк — разделите её на несколько документов")
+        if out:
+            found.append((title, caption or title, out))
+    many = len(found) > 1
+    return [{"section_path": f"лист «{title}», стр. {n}" if many else f"стр. {n}", "chapter": "",
+             "chapter_title": heading, "appendix": "", "kind": "row", "text": text}
+            for title, heading, out in found for n, text in out]
+
+
 def parse_auto(path: Path) -> list[dict]:
     """Структурный парсер по расширению, если он охватил почти весь текст; иначе — parse_plain."""
     structured = {".pdf": parse_instruction_pdf, ".docx": parse_numbered_docx}.get(path.suffix.lower())
@@ -348,6 +444,6 @@ def parse_auto(path: Path) -> list[dict]:
 PARSERS = {
     "instruction_pdf": parse_instruction_pdf,
     "numbered_docx": parse_numbered_docx,
-    "plain": parse_plain,       # любой .docx/.pdf/.txt/.md: пункты «N.M.» и фрагменты по разделам
+    "plain": parse_plain,       # любой .docx/.pdf/.txt/.md: пункты «N.M.» и фрагменты по разделам; .xlsx/.csv — строки
     "auto": parse_auto,         # выбор по содержимому — так подключаются документы из админ-панели
 }

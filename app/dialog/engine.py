@@ -93,21 +93,24 @@ def fmt_date(iso: str) -> str:
         return iso
 
 
-def citation(meta: dict) -> str:
-    """Ссылка на источник из метаданных чанка: документ, редакция, пункт/приложение, глава."""
+def section_label(meta: dict) -> str:
+    """Место в документе: п. 5.4, фрагмент 2, Приложение № 1; строка Матрицы или таблицы («лист «Дела», стр. 5») — как есть."""
     sec = meta["section_path"]
     if meta.get("appendix"):
-        where = f"Приложение № {meta['appendix']}"
-    elif meta.get("kind") == "matrix_row":
-        where = sec
-    elif meta.get("kind") == "fragment":
-        where = f"фрагмент {sec}"
-    else:
-        where = f"п. {sec}"
-    s = f"{meta['short_title']}, ред. {meta['version']} (с {fmt_date(meta['effective_date'])}), {where}"
+        return f"Приложение № {meta['appendix']}"
+    if meta.get("kind") in ("matrix_row", "row"):
+        return sec
+    if meta.get("kind") == "fragment":
+        return f"фрагмент {sec}"
+    return f"п. {sec}"
+
+
+def citation(meta: dict) -> str:
+    """Ссылка на источник из метаданных чанка: документ, редакция, пункт/приложение, глава."""
+    s = f"{meta['short_title']}, ред. {meta['version']} (с {fmt_date(meta['effective_date'])}), {section_label(meta)}"
     if meta.get("chapter") and meta["doc_id"] == "instr_dou":
         s += f" — гл. {meta['chapter']} «{meta['heading']}»"
-    elif meta.get("heading") and meta.get("kind") != "matrix_row":
+    elif meta.get("heading") and meta.get("kind") not in ("matrix_row", "row"):
         s += f" — разд. «{meta['heading']}»"
     if meta.get("status") == "archived":
         s += " [АРХИВНАЯ РЕДАКЦИЯ]"
@@ -261,7 +264,7 @@ class Engine:
                          "входящее письмо?» или «кто визирует приказ о выходных?». Можно без официальных слов и "
                          "с опечатками — я пойму.", actions=self.EXAMPLES, intent="smalltalk")
         h = s.last_hits[0]
-        ref = f"{h.meta['short_title']}, п. {h.section}"
+        ref = f"{h.meta['short_title']}, {section_label(h.meta)}"
         out = ""
         if self.cfg["llm"].get("explain", True):
             try:
@@ -426,10 +429,7 @@ class Engine:
         expl = self.explain(alt or query, quotes[:1])
         parts = []
         for h in quotes:
-            head = "Приложение № " + h.meta["appendix"] if h.meta.get("appendix") else \
-                h.section if h.meta.get("kind") == "matrix_row" else \
-                f"фрагмент {h.section}" if h.meta.get("kind") == "fragment" else f"п. {h.section}"
-            parts.append(f"**{h.meta['short_title']}, {head}** (релевантность {h.percent} %):\n"
+            parts.append(f"**{h.meta['short_title']}, {section_label(h.meta)}** (релевантность {h.percent} %):\n"
                          f"{_quote(h.text, self.rcfg['quote_max_chars'])}")
         body = "\n".join(notes) + ("\n\n" if notes else "")
         if expl:

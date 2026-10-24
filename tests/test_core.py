@@ -347,7 +347,57 @@ def test_plain_and_auto_parsers(tmp_path):
     assert parse_auto(mr) == parse_numbered_docx(mr)                     # структура «N.M.» сохраняется
     assert parse_auto(tmp_path / "reg.docx") == secs                     # без неё — фрагменты по разделам
     with pytest.raises(ValueError):
-        parse_plain(tmp_path / "file.xlsx")
+        parse_plain(tmp_path / "file.pptx")
+
+
+def _registry_xlsx(path: Path) -> Path:
+    """Номенклатура дел: название над шапкой, таблица не с A1, повтор шапки, второй лист, скрытый лист."""
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Номенклатура"
+    ws["B2"] = "Номенклатура дел Департамента ДОУ на 2027 год"
+    head = ["Индекс", "Заголовок дела", "Срок хранения", "Электронное", "Дата начала"]
+    for r, row in {4: head, 5: ["01-01", "Приказы по основной деятельности", "Постоянно", True, dt.datetime(2027, 1, 1)],
+                   6: ["01-02", "Распоряжения", 5.0, False, None], 7: head,
+                   8: ["01-03", "Журнал  регистрации\nвходящих", 1.5, None, None]}.items():
+        for c, v in enumerate(row, start=2):
+            ws.cell(r, c, v)
+    ref = wb.create_sheet("Справочник")
+    ref.append(["Подразделение", "Телефон"])
+    ref.append(["Канцелярия", 1234])
+    hidden = wb.create_sheet("Служебный")
+    hidden.append(["Пароль", "Значение"])
+    hidden.append(["admin", "secret"])
+    hidden.sheet_state = "hidden"
+    wb.save(path)
+    return path
+
+
+def test_table_parser(tmp_path, monkeypatch):
+    from app.ingest import parsers
+    secs = parsers.parse_table(_registry_xlsx(tmp_path / "nom.xlsx"))
+    assert [(s["kind"], s["section_path"], s["chapter_title"]) for s in secs] == [
+        ("row", "лист «Номенклатура», стр. 5", "Номенклатура дел Департамента ДОУ на 2027 год"),
+        ("row", "лист «Номенклатура», стр. 6", "Номенклатура дел Департамента ДОУ на 2027 год"),
+        ("row", "лист «Номенклатура», стр. 8", "Номенклатура дел Департамента ДОУ на 2027 год"),
+        ("row", "лист «Справочник», стр. 2", "Справочник")]                  # повтор шапки и скрытый лист пропущены
+    assert secs[0]["text"] == ("Индекс: 01-01\nЗаголовок дела: Приказы по основной деятельности\n"
+                               "Срок хранения: Постоянно\nЭлектронное: да\nДата начала: 01.01.2027")
+    assert secs[1]["text"] == "Индекс: 01-02\nЗаголовок дела: Распоряжения\nСрок хранения: 5\nЭлектронное: нет"
+    assert secs[2]["text"].endswith("Заголовок дела: Журнал регистрации входящих\nСрок хранения: 1,5")
+    assert secs[3]["text"] == "Подразделение: Канцелярия\nТелефон: 1234"
+    assert parsers.parse_auto(tmp_path / "nom.xlsx") == secs == parsers.parse_plain(tmp_path / "nom.xlsx")
+
+    csv_file = tmp_path / "reg.csv"   # выгрузка из русского Excel: cp1251, «;», пустая строка
+    csv_file.write_bytes("Индекс;Заголовок дела;Срок хранения\r\n01-01;Приказы;Постоянно\r\n\r\n"
+                         "01-02;\"Распоряжения; поручения\";5 лет\r\n".encode("cp1251"))
+    assert [(s["section_path"], s["text"]) for s in parsers.parse_table(csv_file)] == [
+        ("стр. 2", "Индекс: 01-01\nЗаголовок дела: Приказы\nСрок хранения: Постоянно"),
+        ("стр. 4", "Индекс: 01-02\nЗаголовок дела: Распоряжения; поручения\nСрок хранения: 5 лет")]
+    monkeypatch.setattr(parsers, "TABLE_MAX_ROWS", 1)
+    with pytest.raises(ValueError, match="больше 1 строк"):
+        parsers.parse_table(csv_file)
 
 
 def test_new_document_disable_and_restart(tmp_path, monkeypatch):
@@ -374,6 +424,25 @@ def test_new_document_disable_and_restart(tmp_path, monkeypatch):
         frag = next(m for m in metas if m["kind"] == "fragment")
         assert "фрагмент 1" in citation(frag) and "разд. «Регламент работы с электронным архивом»" in citation(frag)
         assert indexer.find_source("doc_test")["parser"] == "auto" and indexer.source_ext("doc_test") == ".docx"
+        indexer.ingest({**new, "doc_id": "doc_table", "title": "Номенклатура дел", "short_title": "Номенклатура"},
+                       file=_registry_xlsx(tmp_path / "nom.xlsx"), version="1.0", effective_date="2027-01-01")
+        rows = {m["section_path"]: m for m in col.get(where={"doc_id": "doc_table"}, include=["metadatas"])["metadatas"]}
+        assert len(rows) == 4 and {m["kind"] for m in rows.values()} == {"row"}
+        row = rows["лист «Номенклатура», стр. 5"]
+        assert citation(row) == "Номенклатура, ред. 1.0 (с 01.01.2027), лист «Номенклатура», стр. 5"
+        assert row["search_text"].startswith("Номенклатура. Номенклатура дел Департамента ДОУ на 2027 год. "
+                                             "лист «Номенклатура», стр. 5. Индекс: 01-01")
+        import openpyxl
+        from app import news
+        wb = openpyxl.load_workbook(tmp_path / "nom.xlsx")
+        wb["Номенклатура"]["D6"] = "10 лет"
+        wb.save(tmp_path / "nom11.xlsx")
+        r = indexer.ingest({**new, "doc_id": "doc_table", "title": "Номенклатура дел", "short_title": "Номенклатура"},
+                           file=tmp_path / "nom11.xlsx", version="1.1", effective_date="2027-02-01")
+        assert r["rows"] == 4 and r["diff"] == {"added": [], "removed": [], "changed": ["лист «Номенклатура», стр. 6"]}
+        items = {n["title"]: n["text"] for n in news.edition_news()}
+        assert items["Новый документ в базе знаний: Номенклатура дел"].endswith("Помощник уже отвечает по нему.")
+        assert "Строки таблицы: изменено: 1 (лист «Номенклатура», стр. 6)." in items["Новая редакция 1.1: Номенклатура дел"]
         with pytest.raises(ValueError, match="не найден текст"):
             empty = tmp_path / "empty.txt"
             empty.write_text("   \n", encoding="utf-8")
