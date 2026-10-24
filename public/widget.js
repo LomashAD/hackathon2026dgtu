@@ -32,7 +32,11 @@
     .fab svg { width: 100%; height: 100%; fill: none; stroke-width: 1.75; }
     .hint { position: absolute; right: 68px; top: 12px; white-space: nowrap; background: #171717; color: #fafafa;
             border: 1px solid #262626; font: 500 14px/20px ${font}; padding: 4px 12px; border-radius: 9999px;
-            box-shadow: rgba(0,0,0,.25) 0 4px 4px 0; }
+            box-shadow: rgba(0,0,0,.25) 0 4px 4px 0;
+            opacity: 0; transform: translateX(12px); pointer-events: none; transition: opacity .2s ease-out, transform .2s ease-out; }
+    /* Подсказка выезжает из-под кнопки при наведении и при фокусе с клавиатуры */
+    .fab:hover .hint, .fab:focus-visible .hint { opacity: 1; transform: none; pointer-events: auto; }
+    @media (prefers-reduced-motion: reduce) { .hint { transform: none; transition: none; } }
     .panel { position: fixed; right: 24px; bottom: 96px; width: 520px; height: 640px; max-height: calc(100vh - 120px);
              display: none; flex-direction: column; background: #0a0a0a; border: 1px solid #262626; border-radius: 10px;
              overflow: hidden; box-shadow: rgba(0,0,0,.3) 0 8px 10px 0; z-index: 2147483000; }
