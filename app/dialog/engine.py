@@ -85,6 +85,8 @@ def citation(meta: dict) -> str:
         where = f"Приложение № {meta['appendix']}"
     elif meta.get("kind") == "matrix_row":
         where = sec
+    elif meta.get("kind") == "fragment":
+        where = f"фрагмент {sec}"
     else:
         where = f"п. {sec}"
     s = f"{meta['short_title']}, ред. {meta['version']} (с {fmt_date(meta['effective_date'])}), {where}"
@@ -229,7 +231,8 @@ class Engine:
         expl = self.explain(text, quotes[:1])
         for h in quotes:
             head = "Приложение № " + h.meta["appendix"] if h.meta.get("appendix") else \
-                h.section if h.meta.get("kind") == "matrix_row" else f"п. {h.section}"
+                h.section if h.meta.get("kind") == "matrix_row" else \
+                f"фрагмент {h.section}" if h.meta.get("kind") == "fragment" else f"п. {h.section}"
             parts.append(f"**{h.meta['short_title']}, {head}** (релевантность {h.percent} %):\n"
                          f"{_quote(h.text, self.rcfg['quote_max_chars'])}")
         body = "\n\n".join(parts)
@@ -238,7 +241,7 @@ class Engine:
         others = [h for h in hits if h not in quotes]
         if others:
             body += "\n\n**См. также:** " + "; ".join(
-                f"{'п. ' + h.section if h.meta.get('kind') == 'point' else h.section} — {h.percent} %"
+                f"{'п. ' + h.section if h.meta.get('kind') == 'point' else 'фрагмент ' + h.section if h.meta.get('kind') == 'fragment' else h.section} — {h.percent} %"
                 + (f" (связан с п. {h.related_to})" if h.related_to else "") for h in others)
         return Reply(body, sources=self._sources(hits), intent=intent,
                      meta={"best": res.best, "explained": bool(expl)})
@@ -517,7 +520,7 @@ class Engine:
 
         fs, s.fill = s.fill, None
         tpl = fs.template
-        out = render(tpl, fs.context())
+        out = render(tpl, fs.context(), owner=s.user)
         appr, src = self._approvers_text(tpl, fs.values)
         lines = [f"✅ Черновик **«{tpl['title']}»** готов — файл `{out.name}` можно скачать ниже.", "",
                  "**Заполненные поля:**"]

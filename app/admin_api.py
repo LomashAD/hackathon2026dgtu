@@ -6,6 +6,7 @@ import datetime as dt
 import os
 import platform
 import re
+import secrets
 import shutil
 import time
 from pathlib import Path
@@ -16,7 +17,8 @@ from pydantic import BaseModel
 from app import news as news_mod
 from app.config import ROOT, get_config, path
 from app.ingest import jobs
-from app.ingest.indexer import find_source, get_collection, ingest, load_registry
+from app.ingest.indexer import disable, find_source, get_collection, ingest, load_registry, source_ext
+from app.ingest.parsers import PLAIN_EXT
 from app.llm.client import get_client
 from app.security import audit, users
 from app.security.access import roles
@@ -60,6 +62,10 @@ class NewsIn(BaseModel):
 class ActivateIn(BaseModel):
     doc_id: str
     version: str
+
+
+class DocIn(BaseModel):
+    doc_id: str
 
 
 def _op(fn, *args, **kwargs):
@@ -202,9 +208,14 @@ def kb(_: dict = Depends(admin)):
             versions.append({k: v.get(k) for k in ("version", "effective_date", "status", "sections", "chunks",
                                                     "ingested_at", "archived_at")}
                             | {"file": Path(v["file"]).name, "diff": {k: len(x) for k, x in diff.items()} if diff else None})
-        docs.append({"doc_id": doc_id, "title": d["title"], "ext": Path(src.get("file", "")).suffix.lower(),
-                     "versions": versions})
-    return {"documents": docs, "job": jobs.current()}
+        flexible = src.get("parser") in ("auto", "plain")
+        docs.append({"doc_id": doc_id, "title": d["title"],
+                     "ext": ",".join(PLAIN_EXT) if flexible else source_ext(doc_id, src),
+                     "access_level": src.get("access_level", "internal"), "parser": src.get("parser"),
+                     "active": any(v["status"] == "active" for v in d["versions"]), "versions": versions})
+    titles = {"public": "Общедоступный", "internal": "Для сотрудников", "confidential": "Ограниченный"}
+    levels = [{"id": lv, "title": titles.get(lv, lv)} for lv in get_config()["access_levels"]]
+    return {"documents": docs, "job": jobs.current(), "access_levels": levels}
 
 
 def _start_ingest(title: str, *args, **kwargs) -> dict:
@@ -228,14 +239,11 @@ async def kb_upload(doc_id: str = Form(...), version: str = Form(...), effective
         dt.date.fromisoformat(effective_date)
     except ValueError:
         raise HTTPException(400, "Дата вступления в силу — в формате ГГГГ-ММ-ДД") from None
-    ext = Path(src["file"]).suffix.lower()
-    if Path(file.filename or "").suffix.lower() != ext:
-        raise HTTPException(400, f"Для этого документа нужен файл {ext}")
-    data = await file.read(MAX_UPLOAD + 1)
-    if not data:
-        raise HTTPException(400, "Файл пустой")
-    if len(data) > MAX_UPLOAD:
-        raise HTTPException(413, "Файл больше 20 МБ")
+    ext = Path(file.filename or "").suffix.lower()
+    allowed = PLAIN_EXT if src.get("parser") in ("auto", "plain") else (source_ext(doc_id, src),)
+    if ext not in allowed:
+        raise HTTPException(400, f"Для этого документа нужен файл {' / '.join(allowed)}")
+    data = await _read_upload(file)
     dest = path("uploads") / f"{doc_id}_v{version}_{dt.datetime.now():%Y%m%d-%H%M%S}{ext}"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(data)
@@ -247,6 +255,71 @@ async def kb_upload(doc_id: str = Form(...), version: str = Form(...), effective
         raise
     audit.log_admin(acc["login"], "kb_upload", f"{doc_id} {version}")
     return job
+
+
+async def _read_upload(file: UploadFile) -> bytes:
+    data = await file.read(MAX_UPLOAD + 1)
+    if not data:
+        raise HTTPException(400, "Файл пустой")
+    if len(data) > MAX_UPLOAD:
+        raise HTTPException(413, "Файл больше 20 МБ")
+    return data
+
+
+@router.post("/kb/add")
+async def kb_add(title: str = Form(...), short_title: str = Form(""), access_level: str = Form("internal"),
+                 version: str = Form("1.0"), effective_date: str = Form(...), file: UploadFile = File(...),
+                 acc: dict = Depends(admin)):
+    """Новый документ базы знаний без правки config.yaml и кода: регламент, памятка, положение (.docx, .pdf,
+    .txt, .md). Структура определяется по содержимому (парсер auto), индексация — в фоне."""
+    title, short = " ".join(title.split()), " ".join(short_title.split())
+    if not 3 <= len(title) <= 200:
+        raise HTTPException(400, "Название — от 3 до 200 символов")
+    short = short[:80] or title[:80]
+    levels = get_config()["access_levels"]
+    if access_level not in levels:
+        raise HTTPException(400, f"Уровень доступа — один из: {', '.join(levels)}")
+    version = version.strip()
+    if not _VERSION.fullmatch(version):
+        raise HTTPException(400, "Редакция — номер вида 1.0 или 2.1")
+    try:
+        dt.date.fromisoformat(effective_date)
+    except ValueError:
+        raise HTTPException(400, "Дата вступления в силу — в формате ГГГГ-ММ-ДД") from None
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in PLAIN_EXT:
+        raise HTTPException(400, f"Поддерживаются файлы {', '.join(PLAIN_EXT)}")
+    if any(" ".join(d["title"].split()).lower() == title.lower() for d in load_registry()["documents"].values()):
+        raise HTTPException(400, "Документ с таким названием уже есть — загрузите его новую редакцию")
+    data = await _read_upload(file)
+    doc_id = "doc_" + secrets.token_hex(4)
+    dest = path("uploads") / f"{doc_id}_v{version}_{dt.datetime.now():%Y%m%d-%H%M%S}{ext}"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(data)
+    src = {"doc_id": doc_id, "title": title, "short_title": short, "parser": "auto", "access_level": access_level}
+    try:
+        job = _start_ingest(f"Новый документ «{short}», ред. {version}", src, file=dest, version=version,
+                            effective_date=effective_date)
+    except HTTPException:
+        dest.unlink(missing_ok=True)
+        raise
+    audit.log_admin(acc["login"], "kb_add", f"{doc_id} {short} ({access_level})")
+    return job
+
+
+@router.post("/kb/disable")
+def kb_disable(body: DocIn, acc: dict = Depends(admin)):
+    """Убрать документ из поиска и с портала: действующая редакция уходит в архив, вернуть — «Сделать действующей»."""
+    src = find_source(body.doc_id)
+    if not src:
+        raise HTTPException(404, "Нет такого документа")
+    if src.get("parser") == "approval_matrix":
+        raise HTTPException(400, "По Матрице визирования код определяет согласующих — загрузите новую редакцию вместо отключения")
+    version = disable(body.doc_id)
+    if version is None:
+        raise HTTPException(400, "У документа нет действующей редакции")
+    audit.log_admin(acc["login"], "kb_disable", f"{body.doc_id} {version}")
+    return {"doc_id": body.doc_id, "archived": version}
 
 
 @router.post("/kb/activate")

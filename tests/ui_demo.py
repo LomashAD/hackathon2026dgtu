@@ -187,8 +187,10 @@ async def main(url: str, login: str, password: str) -> int:
             if hash_ == "#news":
                 check(await wpage.locator("#news-body .card").count() >= 4, "в «Новостях» лента из news.yaml", failures)
             if hash_ == "#docs":
-                check(await wpage.locator("#docs-body a").count() >= 3 and await wpage.locator("#tpl-body tr").count() == 7,
+                check(await wpage.locator("#docs-body tr").count() >= 3 and await wpage.locator("#tpl-body tr").count() == 7,
                       "в «Документах» список документов базы знаний и 7 модулей", failures)
+                check("оригинал — у администратора" in await wpage.inner_text("#docs-body"),
+                      "оригинал Инструкции с закрытыми пунктами сотруднику не выдаётся", failures)
             if hash_ == "#services":
                 check("работает" in await wpage.inner_text("#health"), "в «Сервисах» статус системы", failures)
             if hash_ == "#dou":

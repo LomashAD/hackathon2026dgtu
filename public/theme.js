@@ -60,3 +60,12 @@
   });
   dark.addEventListener('change', () => { const v = saved(); if (v !== 'light' && v !== 'dark') apply('system'); });
 })();
+
+// Чат в окне виджета (iframe): Esc закрывает окно. Нажатия внутри iframe странице портала не видны,
+// поэтому чат сообщает о них сам; если открыто меню или диалог Chainlit, Esc закрывает их, а не окно.
+if (window.parent !== window) {
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]'))
+      window.parent.postMessage({type: 'dou-assistant:close'}, '*');
+  });
+}

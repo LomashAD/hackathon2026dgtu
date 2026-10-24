@@ -229,3 +229,107 @@ def test_admin_panel_api(users, tmp_path, monkeypatch):
 
     st = adm.get("/api/admin/status").json()
     assert st["users"] == 2 and st["models"]["llm"] and st["day"]["questions"] == 1
+
+
+def test_drafts_only_for_author(users, tmp_path, monkeypatch):
+    from app import config as cfgmod
+    real = cfgmod.path
+    monkeypatch.setattr(cfgmod, "path", lambda key: tmp_path / "output" if key == "output_dir" else real(key))
+    users.init_accounts()
+    users.add("ivanov", "Иванов И. И.", "employee")
+    as_user = _client(users)
+    out = tmp_path / "output"
+    out.mkdir()
+    mine = out / "Черновик_Распоряжение_20261024_101500_0a1b2c3d.docx"
+    mine.write_bytes(b"PK draft")
+    (out / (mine.name + ".owner")).write_text("sotrudnik", encoding="utf-8")
+    (out / "Черновик_без_автора.docx").write_bytes(b"PK old")
+    emp, other, adm = as_user("sotrudnik"), as_user("ivanov"), as_user("admin")
+    assert emp.get(f"/api/files/{mine.name}").content == b"PK draft"
+    assert other.get(f"/api/files/{mine.name}").status_code == 404       # чужой — как несуществующий
+    assert adm.get(f"/api/files/{mine.name}").status_code == 404
+    assert emp.get(f"/api/files/{mine.name}.owner").status_code == 404
+    assert emp.get("/api/files/Черновик_без_автора.docx").status_code == 404
+    assert emp.get("/api/files/..%2Fusers").status_code == 404
+
+
+def test_originals_respect_access_levels(users):
+    users.init_accounts()
+    as_user = _client(users)
+    emp, adm = as_user("sotrudnik"), as_user("admin")
+    docs = {d["doc_id"]: d for d in emp.get("/api/kb/documents").json()}
+    if "instr_dou" not in docs:
+        pytest.skip("индекс не построен")
+    # в Инструкции есть закрытые пункты (2.11, 11.13, 11.23): сотрудник не скачает оригинал целиком
+    assert docs["instr_dou"]["restricted"] and docs["instr_dou"]["download"] is None
+    assert emp.get("/api/kb/source/instr_dou").status_code == 403
+    assert emp.get("/api/kb/source/mr_modules").status_code == 200
+    assert adm.get("/api/kb/source/instr_dou").status_code == 200
+    assert {d["doc_id"]: d for d in adm.get("/api/kb/documents").json()}["instr_dou"]["download"]
+
+
+def test_security_headers_and_widget(users, monkeypatch):
+    from chainlit.auth.jwt import create_jwt
+    from chainlit.user import User
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app import api
+    from app.config import get_config
+
+    users.init_accounts()
+    app = FastAPI(routes=api.router.routes)
+    app.middleware("http")(api._security_headers)
+    client = TestClient(app, follow_redirects=False)
+    r = client.get("/login")
+    assert r.headers["content-security-policy"] == "frame-ancestors 'self'"   # чужой сайт не встроит чат
+    assert r.headers["x-content-type-options"] == "nosniff"
+    monkeypatch.setitem(get_config(), "portal", {"embed_origins": "https://portal.corp.example javascript:alert(1)"})
+    assert client.get("/login").headers["content-security-policy"] == "frame-ancestors 'self' https://portal.corp.example"
+    js = client.get("/widget.js")
+    assert js.status_code == 200 and js.headers["content-type"].startswith("application/javascript")
+    assert "attachShadow" in js.text and "/?chat" in js.text
+    token = create_jwt(User(identifier="sotrudnik", metadata={"pwv": users.get("sotrudnik")["pwv"]}))
+    me = TestClient(app, cookies={"access_token": token}).get("/api/me")
+    assert me.status_code == 200 and me.headers["cache-control"] == "no-store"
+
+
+def test_admin_adds_and_disables_documents(users, tmp_path, monkeypatch):
+    from app import admin_api
+
+    users.init_accounts()
+    as_user = _client(users)
+    adm, emp = as_user("admin"), as_user("sotrudnik")
+    calls = []
+    monkeypatch.setattr(admin_api, "ingest", lambda src, **kw: calls.append((src, kw)) or
+                        {"doc_id": src["doc_id"], "version": kw["version"], "sections": 3, "chunks": 3,
+                         "archived_versions": [], "diff": None})
+    form = {"title": "Регламент работы с электронным архивом", "short_title": "Регламент архива",
+            "access_level": "confidential", "version": "1.0", "effective_date": "2027-01-01"}
+    docx = {"file": ("reg.docx", b"PK fake docx", "application/octet-stream")}
+    assert emp.post("/api/admin/kb/add", data=form, files=docx).status_code == 403
+    assert adm.post("/api/admin/kb/add", data=form, files={"file": ("x.xlsx", b"PK", "application/octet-stream")}).status_code == 400
+    assert adm.post("/api/admin/kb/add", data=form | {"access_level": "top"}, files=docx).status_code == 400
+    assert adm.post("/api/admin/kb/add", data=form | {"effective_date": "01.01.2027"}, files=docx).status_code == 400
+    assert adm.post("/api/admin/kb/add", data=form, files={"file": ("reg.docx", b"", "application/octet-stream")}).status_code == 400
+    job = adm.post("/api/admin/kb/add", data=form, files=docx).json()
+    for _ in range(50):
+        job = adm.get("/api/admin/kb/job").json()
+        if job["status"] != "running":
+            break
+        time.sleep(0.05)
+    assert job["status"] == "done"
+    src, kw = calls[0]
+    assert src["doc_id"].startswith("doc_") and src["parser"] == "auto" and src["access_level"] == "confidential"
+    assert kw["file"].parent == tmp_path / "uploads" and kw["file"].suffix == ".docx" and kw["version"] == "1.0"
+    assert json.loads((tmp_path / "audit_log").read_text(encoding="utf-8").splitlines()[-1])["event"] == "admin:kb_add"
+    levels = adm.get("/api/admin/kb").json()["access_levels"]
+    assert [x["id"] for x in levels] == ["public", "internal", "confidential"]
+
+    disabled = []
+    monkeypatch.setattr(admin_api, "disable", lambda doc_id: disabled.append(doc_id) or "1.0")
+    assert emp.post("/api/admin/kb/disable", json={"doc_id": "mr_modules"}).status_code == 403
+    assert adm.post("/api/admin/kb/disable", json={"doc_id": "nope"}).status_code == 404
+    assert adm.post("/api/admin/kb/disable", json={"doc_id": "matrix_viz"}).status_code == 400   # нужна коду согласований
+    assert adm.post("/api/admin/kb/disable", json={"doc_id": "mr_modules"}).json() == {"doc_id": "mr_modules", "archived": "1.0"}
+    assert disabled == ["mr_modules"]

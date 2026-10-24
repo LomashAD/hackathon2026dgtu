@@ -51,23 +51,33 @@ def sanitize(text: str) -> str:
     return re.sub(r"</?\s*(фрагменты|вопрос|сообщение|задача|system|assistant|user)\s*>", " ", text, flags=re.I)
 
 
+def user_text(text: str) -> str:
+    """Текст сотрудника для промпта: без разделителей и (llm.mask_pii) без персональных данных — модели они
+    не нужны, чтобы найти пункт и объяснить его."""
+    from app.config import get_config
+    from app.security.pii import mask
+
+    text = sanitize(text)
+    return mask(text) if get_config()["llm"].get("mask_pii", True) else text
+
+
 def explain_messages(question: str, fragments: list[str]) -> list[dict]:
     frag = "\n---\n".join(sanitize(f) for f in fragments)
     return [
         {"role": "system", "content": EXPLAIN_SYSTEM},
-        {"role": "user", "content": f"<фрагменты>{frag}</фрагменты>\n<вопрос>{sanitize(question)}</вопрос>\nОтвет:"},
+        {"role": "user", "content": f"<фрагменты>{frag}</фрагменты>\n<вопрос>{user_text(question)}</вопрос>\nОтвет:"},
     ]
 
 
 def classify_messages(text: str) -> list[dict]:
     return [{"role": "system", "content": CLASSIFY_SYSTEM},
-            {"role": "user", "content": f"<сообщение>{sanitize(text)}</сообщение>\nОтвет:"}]
+            {"role": "user", "content": f"<сообщение>{user_text(text)}</сообщение>\nОтвет:"}]
 
 
 def pick_template_messages(text: str, titles: list[str]) -> list[dict]:
     lst = "\n".join(f"{i}. {t}" for i, t in enumerate(titles, 1))
     return [{"role": "system", "content": PICK_TEMPLATE_SYSTEM},
-            {"role": "user", "content": f"Шаблоны:\n{lst}\n<задача>{sanitize(text)}</задача>\nОтвет:"}]
+            {"role": "user", "content": f"Шаблоны:\n{lst}\n<задача>{user_text(text)}</задача>\nОтвет:"}]
 
 
 def rephrase_messages(question: str) -> list[dict]:

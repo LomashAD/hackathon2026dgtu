@@ -1,8 +1,8 @@
 """REST API ядра (FastAPI), страница-макет портала с поп-ап виджетом и страница входа.
 
 Роуты добавляются в FastAPI-приложение Chainlit и ставятся перед его catch-all маршрутом.
-Вход — по учётной записи сотрудника (токен Chainlit в cookie); без входа открыты только /login
-и /api/health. Роль и статус учётной записи проверяются на каждом запросе (app/security/users.py).
+Вход — по учётной записи сотрудника (токен Chainlit в cookie); без входа открыты только /login,
+/api/health и /widget.js. Роль и статус учётной записи проверяются на каждом запросе (app/security/users.py).
 """
 from __future__ import annotations
 
@@ -15,9 +15,10 @@ from pydantic import BaseModel
 
 from app.config import ROOT
 from app.dialog.engine import Session, get_engine
-from app.ingest.indexer import load_registry
+from app.ingest.indexer import find_source, load_registry
 from app.llm.client import get_client
 from app.security import audit, users
+from app.security.access import can_open_original
 from app.security.session import account, account_from_request, issue_cookie, login_redirect
 
 router = APIRouter()
@@ -65,12 +66,15 @@ def ask(body: AskIn, acc: dict = Depends(account)):
 
 
 @router.get("/api/files/{name}")
-def files(name: str, _: dict = Depends(account)):
+def files(name: str, acc: dict = Depends(account)):
+    """Черновик, сформированный через API: только автору (в черновике ФИО и должности сотрудников)."""
     from app.config import path
+    from app.templates.render import draft_owner
 
     p = (path("output_dir") / name).resolve()
-    if p.parent != path("output_dir").resolve() or not p.exists():
-        raise HTTPException(404)
+    if p.parent != path("output_dir").resolve() or p.suffix.lower() != ".docx" or not p.exists() \
+            or draft_owner(p) != acc["login"]:
+        raise HTTPException(404)   # чужой черновик неотличим от несуществующего
     return FileResponse(p, filename=p.name)
 
 
@@ -82,27 +86,31 @@ def versions(_: dict = Depends(account)):
 
 
 @router.get("/api/kb/documents")
-def documents(_: dict = Depends(account)):
+def documents(acc: dict = Depends(account)):
     """Документы базы знаний (действующие редакции) — для раздела «Документы» портала."""
     reg = load_registry()
     out = []
     for doc_id, d in reg["documents"].items():
         active = next((v for v in d["versions"] if v["status"] == "active"), None)
         if active:
+            src = find_source(doc_id) or {}
+            ok = can_open_original(acc["role"], src)
             out.append({"doc_id": doc_id, "title": d["title"], "version": active["version"],
                         "effective_date": active["effective_date"], "sections": active["sections"],
                         "archived": [v["version"] for v in d["versions"] if v["status"] == "archived"],
-                        "download": f"/api/kb/source/{doc_id}"})
+                        "download": f"/api/kb/source/{doc_id}" if ok else None, "restricted": not ok})
     return out
 
 
 @router.get("/api/kb/source/{doc_id}")
-def source_file(doc_id: str, _: dict = Depends(account)):
+def source_file(doc_id: str, acc: dict = Depends(account)):
     reg = load_registry()
     d = reg["documents"].get(doc_id)
     active = next((v for v in d["versions"] if v["status"] == "active"), None) if d else None
     if not active:
         raise HTTPException(404)
+    if not can_open_original(acc["role"], find_source(doc_id) or {}):
+        raise HTTPException(403, "В документе есть пункты ограниченного доступа: оригинал выдаёт администратор")
     p = (ROOT / active["file"]).resolve()
     if not p.is_relative_to(ROOT) or not p.exists():
         raise HTTPException(404)
@@ -110,11 +118,11 @@ def source_file(doc_id: str, _: dict = Depends(account)):
 
 
 @router.get("/api/news")
-def news(_: dict = Depends(account)):
+def news(acc: dict = Depends(account)):
     """Лента вкладки «Новости»: news.yaml + новости о новых редакциях из реестра версий."""
     from app.news import news as load_news
 
-    return load_news()
+    return load_news(role=acc["role"])
 
 
 @router.get("/api/templates")
@@ -169,6 +177,14 @@ def login_page(request: Request):
     return HTMLResponse((ROOT / "public" / "login.html").read_text(encoding="utf-8"))
 
 
+@router.get("/widget.js", include_in_schema=False)
+def widget_script():
+    """Виджет для внутреннего портала: <script src="https://<адрес помощника>/widget.js" defer></script>.
+    Сам чат открывается в iframe и требует входа; портал должен быть в portal.embed_origins."""
+    return Response((ROOT / "public" / "widget.js").read_text(encoding="utf-8"), media_type="application/javascript",
+                    headers={"Cache-Control": "max-age=300"})
+
+
 @router.get("/widget", response_class=HTMLResponse)
 def widget(request: Request):
     if account_from_request(request) is None:
@@ -205,6 +221,32 @@ async def _strip_external(request, call_next):
     return Response(html, status_code=response.status_code, headers=headers, media_type="text/html")
 
 
+_ORIGIN = re.compile(r"https?://[A-Za-z0-9.-]+(:\d{1,5})?")
+
+
+def embed_origins() -> list[str]:
+    """Порталы, которым можно встраивать чат (portal.embed_origins: адреса через пробел или списком)."""
+    from app.config import get_config
+
+    raw = (get_config().get("portal") or {}).get("embed_origins") or []
+    items = raw.split() if isinstance(raw, str) else list(raw)
+    return [o.rstrip("/") for o in items if _ORIGIN.fullmatch(o.rstrip("/"))]
+
+
+async def _security_headers(request, call_next):
+    """Заголовки защиты: чужие сайты не встроят чат в iframe (кроме портала из portal.embed_origins),
+    ответы API не кэшируются, браузер не угадывает тип содержимого."""
+    response = await call_next(request)
+    h = response.headers
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("Referrer-Policy", "same-origin")
+    if h.get("content-type", "").startswith("text/html"):
+        h["Content-Security-Policy"] = "frame-ancestors " + " ".join(["'self'", *embed_origins()])
+    if request.url.path.startswith("/api/") and "cache-control" not in h:
+        h["Cache-Control"] = "no-store"
+    return response
+
+
 def install_routes() -> None:
     from chainlit.server import app
 
@@ -213,6 +255,7 @@ def install_routes() -> None:
     from app.admin_api import router as admin_router
 
     app.middleware("http")(_strip_external)
+    app.middleware("http")(_security_headers)    # внешний слой: заголовки ставятся и на пересобранный HTML
     before = len(app.router.routes)
     app.include_router(router)
     app.include_router(admin_router)

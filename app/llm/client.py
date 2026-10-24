@@ -1,8 +1,11 @@
 """Клиент локального Ollama: чат и эмбеддинги. Никаких внешних API."""
 from __future__ import annotations
 
+import ipaddress
 import logging
+import socket
 import time
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -11,10 +14,29 @@ from app.config import get_config
 log = logging.getLogger(__name__)
 
 
+def is_internal(url: str) -> bool:
+    """Адрес модели внутри контура: localhost, частная сеть или имя сервиса без домена (ollama в Docker)."""
+    host = urlsplit(url).hostname or ""
+    try:
+        ips = {ipaddress.ip_address(a[4][0].split("%")[0]) for a in socket.getaddrinfo(host, None)}
+    except (OSError, ValueError):
+        return host == "localhost" or ("." not in host and ":" not in host and bool(host))
+    return bool(ips) and all(ip.is_private or ip.is_loopback for ip in ips)
+
+
+class RemoteModelError(RuntimeError):
+    """llm.base_url указывает за пределы контура."""
+
+
 class OllamaClient:
     def __init__(self, cfg: dict | None = None):
         cfg = cfg or get_config()
         self.base = cfg["llm"]["base_url"].rstrip("/")
+        # Фрагменты базы знаний и вопросы сотрудников не должны уйти во внешний сервис из-за ошибки в настройках
+        if not cfg["llm"].get("allow_remote", False) and not is_internal(self.base):
+            raise RemoteModelError(f"llm.base_url = {self.base} — адрес вне внутренней сети. Данные базы знаний "
+                                   "передаются только локальной модели; если внешний адрес нужен осознанно, "
+                                   "задайте llm.allow_remote: true в config.yaml")
         self.model = cfg["llm"]["model"]
         self.temperature = cfg["llm"].get("temperature", 0)
         self.num_ctx = cfg["llm"].get("num_ctx", 4096)
@@ -53,7 +75,7 @@ class OllamaClient:
             names = {m["name"] for m in tags.get("models", [])}
             def has(n):
                 return n in names or f"{n}:latest" in names
-            return {"ok": True, "llm": has(self.model), "embed": has(self.embed_model)}
+            return {"ok": True, "llm": has(self.model), "embed": has(self.embed_model), "internal": is_internal(self.base)}
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "error": str(e)}
 

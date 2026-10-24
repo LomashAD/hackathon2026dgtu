@@ -68,7 +68,7 @@ def build_chunks(sections: list[dict], source: dict, version: str, effective_dat
         heading = s.get("chapter_title", "")
         parts = _split_long(s["text"], max_chars)
         for i, part in enumerate(parts):
-            label = f"п. {sid}" if s["kind"] == "point" else sid
+            label = f"п. {sid}" if s["kind"] == "point" else f"фрагмент {sid}" if s["kind"] == "fragment" else sid
             prefix = f"{source.get('short_title', source['title'])}. "
             if s.get("chapter"):
                 prefix += f"Глава {s['chapter']}. {heading}. " if source["parser"] == "instruction_pdf" \

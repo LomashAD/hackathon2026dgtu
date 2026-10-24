@@ -6,7 +6,7 @@ user_env = []
 session_timeout = 3600
 
 # Duration (in seconds) of the user session expiry
-user_session_timeout = 1296000  # 15 days
+user_session_timeout = 43200  # 12 часов: вход действует рабочий день, дальше — снова логин и пароль
 
 # Enable third parties caching (e.g., LangChain cache)
 cache = false

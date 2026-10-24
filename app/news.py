@@ -15,7 +15,7 @@ from pathlib import Path
 
 import yaml
 
-from app.config import path
+from app.config import get_config, path
 from app.ingest.indexer import load_registry
 
 log = logging.getLogger(__name__)
@@ -148,15 +148,35 @@ def _sections(keys: list[str], limit: int = 5) -> str:
     return ", ".join(names) + (" и др." if len(keys) > limit else "")
 
 
-def edition_news(reg: dict | None = None) -> list[dict]:
-    """Новость на каждую загруженную новую редакцию (у версии есть предыдущая — значит, есть дифф)."""
+def edition_news(reg: dict | None = None, role: str | None = None) -> list[dict]:
+    """Новость на каждую загруженную новую редакцию (у версии есть предыдущая — значит, есть дифф) и на документ,
+    добавленный после запуска (из админ-панели или scripts/ingest.py). role — только документы, доступные роли:
+    название закрытого документа и номера его пунктов остальным не показываются."""
+    from app.security.access import allowed_levels
+
     reg = reg or load_registry()
+    configured = {s["doc_id"] for s in get_config()["sources"]}
+    levels = set(allowed_levels(role)) if role is not None else None
     out = []
     for doc_id, d in reg["documents"].items():
-        for v in d["versions"]:
+        src = d.get("source") or {}
+        if levels is not None and src.get("access_level", "internal") not in levels:
+            continue
+        hidden = {k for k, lv in (src.get("access_overrides") or {}).items() if levels is not None and lv not in levels}
+        for i, v in enumerate(sorted(d["versions"], key=lambda x: x.get("ingested_at", ""))):
             diff = v.get("diff_from_previous")
+            if diff is None and i == 0 and doc_id not in configured:
+                now = ("Помощник уже отвечает по нему." if v.get("status") == "active"
+                       else "Сейчас документ отключён.")
+                out.append({
+                    "date": v["ingested_at"][:10], "unit": "База знаний помощника", "auto": True,
+                    "title": f"Новый документ в базе знаний: {d['title']}",
+                    "text": f"Ред. {v['version']}, действует с {_fmt_date(v['effective_date'])}. {now}",
+                    "link": "#docs", "link_label": "К документам", "doc_id": doc_id,
+                })
             if diff is None:
                 continue
+            diff = {k: [x for x in diff[k] if x not in hidden] for k in ("changed", "added", "removed")}
             parts = [f"{label}: {len(diff[k])} ({_sections(diff[k])})"
                      for k, label in (("changed", "изменено"), ("added", "добавлено"), ("removed", "исключено"))
                      if diff[k]]
@@ -173,7 +193,7 @@ def edition_news(reg: dict | None = None) -> list[dict]:
     return out
 
 
-def news(news_file: Path | None = None, reg: dict | None = None) -> list[dict]:
+def news(news_file: Path | None = None, reg: dict | None = None, role: str | None = None) -> list[dict]:
     """Вся лента, свежие сверху; при равной дате — порядок файла, новости о редакциях первыми."""
-    items = edition_news(reg) + file_news(news_file)
+    items = edition_news(reg, role) + file_news(news_file)
     return sorted(items, key=lambda n: n["date"], reverse=True)

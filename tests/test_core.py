@@ -169,6 +169,8 @@ def test_pii_mask():
     from app.security.pii import mask
     s = mask("Иванов И. И., тел. +7 (999) 123-45-67, ivanov@org.ru, П. П. Петров, СНИЛС 123-456-789 01")
     assert "Иванов" not in s and "Петров" not in s and "999" not in s and "@" not in s and "123-456" not in s
+    assert mask("Что изменилось в ред. 1.1?") == "Что изменилось в ред. 1.1?"     # «д.» внутри слова — не адрес
+    assert mask("ул. Ленина, д. 5") == "[ADDRESS], [ADDRESS]"
 
 
 def test_access_where():
@@ -304,3 +306,137 @@ def test_ollama_down_message(monkeypatch):
     r = eng.handle(Session(role="admin"), "Когда нужно зарегистрировать входящий документ?")
     assert r.intent == "error"
     assert "Ollama" in r.text and "Errno" not in r.text and "переформулир" in r.text.lower()
+
+
+# ------------------------------------------------------------------ новые источники и защита данных
+
+def _new_regulation(path: Path) -> Path:
+    import docx
+    d = docx.Document()
+    d.add_heading("Регламент работы с электронным архивом", level=1)
+    d.add_paragraph("Регламент определяет порядок передачи электронных документов в архив.")
+    d.add_heading("Сроки передачи", level=2)
+    d.add_paragraph("Электронные документы передаются в архив не позднее трёх лет после завершения дела.")
+    d.add_paragraph("2.1. Ответственный за архив проверяет состав дела перед приёмом.")
+    d.add_paragraph("Проверка фиксируется в карточке дела.")
+    d.save(str(path))
+    return path
+
+
+def test_plain_and_auto_parsers(tmp_path):
+    from app.ingest.parsers import parse_auto, parse_numbered_docx, parse_plain
+    secs = parse_plain(_new_regulation(tmp_path / "reg.docx"))
+    assert [(s["kind"], s["section_path"], s["chapter_title"]) for s in secs] == [
+        ("fragment", "1", "Регламент работы с электронным архивом"), ("fragment", "2", "Сроки передачи"),
+        ("point", "2.1", "Сроки передачи")]
+    assert secs[2]["text"].endswith("Проверка фиксируется в карточке дела.")        # абзац — продолжение пункта
+    md = tmp_path / "memo.md"
+    md.write_text("# Памятка\n\nПисьмо подписывает руководитель.\n\n## Визы\n\nВизы ставятся в ИИС ДО.", encoding="utf-8")
+    assert [(s["chapter_title"], s["text"]) for s in parse_plain(md)] == [
+        ("Памятка", "Письмо подписывает руководитель."), ("Визы", "Визы ставятся в ИИС ДО.")]
+    mr = ROOT / "data" / "Методические_рекомендации_по_работе_с_модульными_документами.docx"
+    assert parse_auto(mr) == parse_numbered_docx(mr)                     # структура «N.M.» сохраняется
+    assert parse_auto(tmp_path / "reg.docx") == secs                     # без неё — фрагменты по разделам
+    with pytest.raises(ValueError):
+        parse_plain(tmp_path / "file.xlsx")
+
+
+def test_new_document_disable_and_restart(tmp_path, monkeypatch):
+    from app import config as cfgmod
+    cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
+    for k in ("storage_dir", "index_dir", "registry", "matrix"):
+        cfg["paths"][k] = str(tmp_path / Path(cfg["paths"][k]).name)
+    cfg["sources"] = [s for s in cfg["sources"] if s["doc_id"] == "mr_modules"]
+    (tmp_path / "config.yaml").write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+    monkeypatch.setenv("APP_CONFIG", str(tmp_path / "config.yaml"))
+    cfgmod.get_config.cache_clear()
+    try:
+        from app.dialog.engine import citation
+        from app.ingest import indexer
+        from app.llm import client
+        monkeypatch.setattr(client, "get_client", lambda: type("C", (), {"embed": staticmethod(_fake_embed)})())
+        new = {"doc_id": "doc_test", "title": "Регламент работы с электронным архивом", "short_title": "Регламент архива",
+               "parser": "auto", "access_level": "confidential"}
+        r = indexer.ingest(new, file=_new_regulation(tmp_path / "reg.docx"), version="1.0", effective_date="2027-01-01")
+        assert r["sections"] == 3
+        col = indexer.get_collection()
+        metas = col.get(where={"doc_id": "doc_test"}, include=["metadatas"])["metadatas"]
+        assert {m["access_level"] for m in metas} == {"confidential"}
+        frag = next(m for m in metas if m["kind"] == "fragment")
+        assert "фрагмент 1" in citation(frag) and "разд. «Регламент работы с электронным архивом»" in citation(frag)
+        assert indexer.find_source("doc_test")["parser"] == "auto" and indexer.source_ext("doc_test") == ".docx"
+        with pytest.raises(ValueError, match="не найден текст"):
+            empty = tmp_path / "empty.txt"
+            empty.write_text("   \n", encoding="utf-8")
+            indexer.ingest({**new, "doc_id": "doc_empty"}, file=empty)
+
+        assert indexer.ingest_all()[0]["chunks"] == 16                     # mr_modules ещё не загружен
+        assert indexer.disable("mr_modules") == "1.0"
+        assert indexer.active_version("mr_modules") is None
+        assert not col.get(where={"$and": [{"doc_id": "mr_modules"}, {"status": "active"}]})["ids"]
+        assert indexer.disable("mr_modules") is None
+        again = indexer.ingest_all()                                       # перезапуск не включает отключённый
+        assert again[0]["skipped"] and again[0]["reason"] == "отключён администратором"
+        assert indexer.active_version("mr_modules") is None
+    finally:
+        cfgmod.get_config.cache_clear()
+
+
+def test_model_only_inside_network():
+    from app.config import get_config
+    from app.llm.client import OllamaClient, RemoteModelError, is_internal
+    assert is_internal("http://localhost:11434") and is_internal("http://127.0.0.1:11434")
+    assert is_internal("http://10.20.30.40:11434") and is_internal("http://ollama:11434")   # сервис в Docker
+    assert not is_internal("http://8.8.8.8:11434")
+    cfg = {**get_config(), "llm": {**get_config()["llm"], "base_url": "http://8.8.8.8:11434"}}
+    with pytest.raises(RemoteModelError):
+        OllamaClient(cfg)
+    OllamaClient({**cfg, "llm": {**cfg["llm"], "allow_remote": True}})    # только осознанно, флагом
+
+
+def test_prompts_without_personal_data():
+    from app.llm.prompts import classify_messages, explain_messages
+    q = "Письмо Иванову Ивану Ивановичу, тел. +7 999 123-45-67 — кто визирует?"
+    for msgs in (explain_messages(q, ["Письмо визирует руководитель."]), classify_messages(q)):
+        user = msgs[-1]["content"]
+        assert "Иванову" not in user and "999" not in user and "кто визирует" in user
+    assert "Иван Иванович" not in explain_messages(q, ["Иванов Иван Иванович подписывает."])[-1]["content"].split("<вопрос>")[1]
+
+
+def test_news_respect_access_levels():
+    from app.news import edition_news
+    reg = {"documents": {
+        "doc_secret": {"title": "Закрытый регламент", "source": {"access_level": "confidential"}, "versions": [
+            {"version": "1.0", "effective_date": "2027-01-01", "ingested_at": "2026-10-24T10:00:00", "status": "active",
+             "diff_from_previous": None}]},
+        "instr_dou": {"title": "Инструкция", "source": {"access_level": "internal", "access_overrides": {"2.11": "confidential"}},
+                      "versions": [{"version": "1.1", "effective_date": "2027-01-15", "ingested_at": "2026-12-01T10:00:00",
+                                    "status": "active", "diff_from_previous": {"added": [], "removed": [], "changed": ["2.11", "5.6"]}}]},
+    }}
+    emp = edition_news(reg, "employee")
+    assert [n["title"] for n in emp] == ["Новая редакция 1.1: Инструкция"] and "2.11" not in emp[0]["text"]
+    adm = {n["title"]: n for n in edition_news(reg, "admin")}
+    assert "Новый документ в базе знаний: Закрытый регламент" in adm and "2.11" in adm["Новая редакция 1.1: Инструкция"]["text"]
+
+
+def test_drafts_owner_and_ttl(tmp_path):
+    import os
+    import time as _time
+
+    from app.templates.catalog import load_templates
+    from app.templates.render import draft_owner, purge_drafts, render
+    from app.templates.slots import FillSession
+    tpl = load_templates()["order_responsible_records"] if "order_responsible_records" in load_templates() \
+        else next(iter(load_templates().values()))
+    s = FillSession(tpl)
+    while not s.done():
+        f = s.current()
+        s.answer(f.get("example") or f.get("default") or {"yesno": "да", "choice": (f.get("options") or [""])[0]}.get(f["type"], "нет"))
+    a, b = (render(tpl, s.context(), out_dir=tmp_path, owner="sotrudnik") for _ in range(2))
+    assert a != b and re.search(r"_\d{8}_\d{6}_[0-9a-f]{8}\.docx$", a.name)     # имя не подобрать по времени
+    assert draft_owner(a) == "sotrudnik"
+    old = _time.time() - 25 * 3600
+    for f in (a, a.with_name(a.name + ".owner")):
+        os.utime(f, (old, old))
+    assert purge_drafts(tmp_path, ttl_hours=24) == 1 and not a.exists() and b.exists()
+    assert not a.with_name(a.name + ".owner").exists()

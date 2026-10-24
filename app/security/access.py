@@ -14,6 +14,17 @@ def allowed_levels(role: str) -> list[str]:
     return list(r["levels"])
 
 
+def doc_levels(source: dict) -> set[str]:
+    """Уровни доступа, которые встречаются в документе: общий и у отдельных пунктов (access_overrides)."""
+    return {source.get("access_level", "internal"), *(source.get("access_overrides") or {}).values()}
+
+
+def can_open_original(role: str, source: dict) -> bool:
+    """Оригинал файла целиком — только роли, которой доступны все его пункты: иначе закрытые пункты,
+    скрытые фильтром в поиске, можно было бы прочитать в скачанном файле."""
+    return doc_levels(source) <= set(allowed_levels(role))
+
+
 def can_view_archive(role: str) -> bool:
     return bool(roles().get(role, {}).get("can_view_archive"))
 

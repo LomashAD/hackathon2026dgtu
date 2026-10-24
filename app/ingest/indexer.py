@@ -113,6 +113,8 @@ def ingest(source: dict, file: Path | None = None, version: str | None = None,
         return {"doc_id": doc_id, "version": version, "skipped": True, "reason": "версия уже загружена"}
 
     sections, matrix = parse_source(source, file)
+    if not sections:
+        raise ValueError("В файле не найден текст: документ пустой или это скан без текстового слоя")
     chunks = build_chunks(sections, source, version, effective_date)
     if embedder is None:
         from app.llm.client import get_client
@@ -163,19 +165,47 @@ def ingest(source: dict, file: Path | None = None, version: str | None = None,
 
 
 def ingest_all(force: bool = False) -> list[dict]:
-    """Загрузить источники из config.yaml, у которых ещё нет действующей редакции. Документ с действующей
-    редакцией пропускается: иначе при запуске (run.sh) редакция из config.yaml снова стала бы действующей
-    поверх загруженной позже (scripts/ingest.py --version или админ-панель)."""
+    """Загрузить источники из config.yaml, которых ещё нет в реестре. Документ из реестра пропускается: иначе
+    при запуске (run.sh) редакция из config.yaml снова стала бы действующей поверх загруженной позже
+    (scripts/ingest.py --version или админ-панель), а отключённый администратором документ — снова включился бы."""
     out = []
     reg = load_registry()
     for src in get_config()["sources"]:
-        act = None if force else active_version(src["doc_id"], reg)
-        if act:
-            out.append({"doc_id": src["doc_id"], "version": act["version"], "skipped": True,
-                        "reason": f"уже загружен, действует ред. {act['version']}"})
+        doc = None if force else reg["documents"].get(src["doc_id"])
+        if doc and doc["versions"]:
+            act = active_version(src["doc_id"], reg)
+            out.append({"doc_id": src["doc_id"], "version": act["version"] if act else None, "skipped": True,
+                        "reason": f"уже загружен, действует ред. {act['version']}" if act else "отключён администратором"})
             continue
         out.append(ingest(src, force=force))
     return out
+
+
+def disable(doc_id: str) -> str | None:
+    """Убрать документ из поиска: действующая редакция уходит в архив (вернуть — «Сделать действующей»).
+    Возвращает номер отключённой редакции или None, если действующей не было."""
+    reg = load_registry()
+    act = active_version(doc_id, reg)
+    if not act:
+        return None
+    col = get_collection()
+    got = col.get(where={"$and": [{"doc_id": doc_id}, {"version": act["version"]}]}, include=["metadatas"])
+    if got["ids"]:
+        col.update(ids=got["ids"], metadatas=[{**m, "status": "archived"} for m in got["metadatas"]])
+    act["status"] = "archived"
+    act["archived_at"] = dt.datetime.now().isoformat(timespec="seconds")
+    save_registry(reg)
+    return act["version"]
+
+
+def source_ext(doc_id: str, source: dict | None = None) -> str:
+    """Расширение файла документа: из config.yaml или из последней загруженной редакции."""
+    source = source or find_source(doc_id) or {}
+    if source.get("file"):
+        return Path(source["file"]).suffix.lower()
+    doc = load_registry()["documents"].get(doc_id) or {"versions": []}
+    files = [v["file"] for v in sorted(doc["versions"], key=lambda v: v.get("ingested_at", ""))]
+    return Path(files[-1]).suffix.lower() if files else ""
 
 
 def find_source(doc_id: str) -> dict | None:

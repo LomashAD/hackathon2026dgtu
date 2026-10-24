@@ -2,7 +2,7 @@
 
 Каждый парсер возвращает список секций:
     {"section_path": "5.4.1", "chapter": "5", "chapter_title": "...",
-     "appendix": "" | "1", "text": "...", "kind": "point" | "appendix" | "preamble"}
+     "appendix": "" | "1", "text": "...", "kind": "point" | "appendix" | "preamble" | "fragment"}
 """
 from __future__ import annotations
 
@@ -242,7 +242,112 @@ def matrix_sections(matrix: dict) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- произвольный документ
+
+PLAIN_EXT = (".docx", ".pdf", ".txt", ".md")
+_HEADING_STYLE = re.compile(r"^(heading|заголовок|title|название)", re.I)
+_FRAGMENT_CHARS = 900
+
+
+def _plain_blocks(path: Path) -> list[tuple[str, bool]]:
+    """Абзацы документа без структуры «N.M.»: (текст, заголовок ли)."""
+    ext = path.suffix.lower()
+    out: list[tuple[str, bool]] = []
+    if ext == ".docx":
+        import docx
+
+        d = docx.Document(str(path))
+        for para in d.paragraphs:
+            t = para.text.strip()
+            if t:
+                style = para.style.name if para.style is not None else ""
+                out.append((t, bool(_HEADING_STYLE.match(style)) and len(t) < 150))
+        for table in d.tables:
+            for row in table.rows:
+                cells = list(dict.fromkeys(c.text.strip() for c in row.cells if c.text.strip()))
+                if cells:
+                    out.append((" | ".join(cells), False))
+    elif ext == ".pdf":
+        cur = ""
+        for text, _x0, bold, _page in _pdf_lines(path):
+            if bold and len(text) < 120:
+                if cur:
+                    out.append((cur, False))
+                out.append((text, True))
+                cur = ""
+            elif cur and (re.match(r"^(\d+[.)]|[•–—-])\s", text) or (cur[-1] in ".:;!?" and text[:1].isupper())):
+                out.append((cur, False))
+                cur = text
+            else:
+                cur = _join(cur, text)
+        if cur:
+            out.append((cur, False))
+    elif ext in (".txt", ".md"):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for block in re.split(r"\n\s*\n", text):
+            lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+            for ln in [x for x in lines if x.startswith("#")]:
+                out.append((ln.lstrip("#").strip(), True))
+            body = " ".join(x for x in lines if not x.startswith("#"))
+            if body:
+                out.append((body, False))
+    else:
+        raise ValueError(f"Формат {ext or 'без расширения'} не поддерживается: нужен {', '.join(PLAIN_EXT)}")
+    return out
+
+
+def parse_plain(path: Path) -> list[dict]:
+    """Любой документ: пункты «N.M.» — как пункты, остальной текст — фрагменты до ~900 символов
+    в пределах раздела (заголовка). Для регламентов и памяток без строгой нумерации."""
+    sections: list[dict] = []
+    heading, buf, n, point = "", [], 0, None
+
+    def flush() -> None:
+        nonlocal buf, n
+        if buf:
+            n += 1
+            sections.append({"section_path": str(n), "chapter": "", "chapter_title": heading, "appendix": "",
+                             "kind": "fragment", "text": "\n".join(buf)})
+            buf = []
+
+    for text, is_heading in _plain_blocks(path):
+        m = POINT_RE.match(text)
+        if is_heading:
+            flush()
+            heading, point = text, None
+        elif m and not any(s["section_path"] == m.group(1) for s in sections):
+            flush()
+            point = {"section_path": m.group(1), "chapter": "", "chapter_title": heading, "appendix": "",
+                     "kind": "point", "text": m.group(2)}
+            sections.append(point)
+        elif point is not None:
+            point["text"] += "\n" + text
+        else:
+            if buf and sum(len(x) for x in buf) + len(text) > _FRAGMENT_CHARS:
+                flush()
+            buf.append(text)
+    flush()
+    return sections
+
+
+def parse_auto(path: Path) -> list[dict]:
+    """Структурный парсер по расширению, если он охватил почти весь текст; иначе — parse_plain."""
+    structured = {".pdf": parse_instruction_pdf, ".docx": parse_numbered_docx}.get(path.suffix.lower())
+    plain = parse_plain(path)
+    if structured:
+        try:
+            secs = structured(path)
+        except Exception:  # noqa: BLE001 — не та структура
+            secs = []
+        total = sum(len(s["text"]) for s in plain) or 1
+        if sum(s["kind"] == "point" for s in secs) >= 5 and sum(len(s["text"]) for s in secs) >= 0.8 * total:
+            return secs
+    return plain
+
+
 PARSERS = {
     "instruction_pdf": parse_instruction_pdf,
     "numbered_docx": parse_numbered_docx,
+    "plain": parse_plain,       # любой .docx/.pdf/.txt/.md: пункты «N.M.» и фрагменты по разделам
+    "auto": parse_auto,         # выбор по содержимому — так подключаются документы из админ-панели
 }

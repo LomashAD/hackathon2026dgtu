@@ -9,9 +9,11 @@ from __future__ import annotations
 import copy
 import datetime as dt
 import re
+import secrets
+import time
 from pathlib import Path
 
-from app.config import ROOT, path
+from app.config import ROOT, get_config, path
 
 
 def _set_text(paragraph, text: str) -> None:
@@ -135,15 +137,42 @@ def template_docx(tpl: dict, rebuild: bool = False) -> Path:
     return out
 
 
-def render(tpl: dict, context: dict, out_dir: Path | None = None) -> Path:
+OWNER_SUFFIX = ".owner"   # рядом с черновиком — логин автора: скачать файл через API может только он
+
+
+def draft_owner(file: Path) -> str:
+    f = file.with_name(file.name + OWNER_SUFFIX)
+    return f.read_text(encoding="utf-8").strip() if f.exists() else ""
+
+
+def purge_drafts(out_dir: Path | None = None, ttl_hours: float | None = None) -> int:
+    """Удалить черновики старше security.drafts_ttl_hours (в них ФИО и должности сотрудников)."""
+    out_dir = out_dir or path("output_dir")
+    ttl = ttl_hours if ttl_hours is not None else get_config()["security"].get("drafts_ttl_hours", 24)
+    if not ttl or not out_dir.exists():
+        return 0
+    old = time.time() - ttl * 3600
+    n = 0
+    for f in out_dir.iterdir():
+        if f.is_file() and f.stat().st_mtime < old:
+            f.unlink(missing_ok=True)
+            n += f.suffix == ".docx"
+    return n
+
+
+def render(tpl: dict, context: dict, out_dir: Path | None = None, owner: str = "") -> Path:
     from docxtpl import DocxTemplate
 
     tp = DocxTemplate(str(template_docx(tpl)))
     tp.render(context, autoescape=True)
     out_dir = out_dir or path("output_dir")
     out_dir.mkdir(parents=True, exist_ok=True)
+    purge_drafts(out_dir)
     stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     name = re.sub(r"[^\w]+", "_", tpl["title"])[:60]
-    out = out_dir / f"Черновик_{name}_{stamp}.docx"
+    # случайная часть: имя черновика не подобрать по шаблону и времени
+    out = out_dir / f"Черновик_{name}_{stamp}_{secrets.token_hex(4)}.docx"
     tp.save(str(out))
+    if owner:
+        out.with_name(out.name + OWNER_SUFFIX).write_text(owner, encoding="utf-8")
     return out

@@ -34,7 +34,7 @@ def main() -> None:
     ap.add_argument("--version", help="номер версии, например 1.1")
     ap.add_argument("--date", help="дата вступления в силу YYYY-MM-DD")
     ap.add_argument("--title", help="название (для нового документа)")
-    ap.add_argument("--parser", help="instruction_pdf | numbered_docx | approval_matrix")
+    ap.add_argument("--parser", help="auto | plain | instruction_pdf | numbered_docx | approval_matrix")
     ap.add_argument("--access-level", default=None)
     ap.add_argument("--all", action="store_true", help="загрузить все источники из config.yaml")
     ap.add_argument("--force", action="store_true")
