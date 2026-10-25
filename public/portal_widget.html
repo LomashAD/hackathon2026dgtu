@@ -38,6 +38,15 @@
   header { position:sticky; top:8px; z-index:5; margin:8px 16px 0; min-height:56px; padding:8px 8px 8px 16px;
            background:var(--bg); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow-sm);
            display:flex; gap:8px 16px; align-items:center; flex-wrap:wrap; }
+  /* На десктопе шапка закреплена на одном месте: fixed не сдвигается ни прокруткой, ни «отскоком» у края страницы.
+     Полоса фона под ней скрывает прокручиваемое содержимое; место под шапку — отступ body (--hdr-h ставит скрипт
+     после шапки: вкладки на средней ширине переносятся во вторую строку). scrollbar-gutter — шапка не сдвигается вбок
+     между вкладками с полосой прокрутки и без неё. Мобильная шапка (.compact-nav) — прежняя, sticky. */
+  html:not(.compact-nav) { scrollbar-gutter:stable; overscroll-behavior-y:none; }
+  html:not(.compact-nav) body { padding-top:calc(8px + var(--hdr-h, 56px)); }
+  html:not(.compact-nav) body::before { content:""; position:fixed; inset:0 0 auto; height:calc(16px + var(--hdr-h, 56px));
+                                        background:var(--bg); z-index:4; }
+  html:not(.compact-nav) header { position:fixed; top:8px; left:16px; right:16px; margin:0; }
   header b { display:flex; align-items:center; gap:8px; font-size:14px; line-height:20px; font-weight:600; white-space:nowrap; }
   header b::before { content:""; width:24px; height:24px; flex:none; background:url("/public/favicon.svg") center / contain no-repeat; }
   .tools { margin-left:auto; display:flex; align-items:center; gap:8px; font-size:14px; }
@@ -302,6 +311,12 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path class="l1" d="M4 7h16"/><path class="l2" d="M4 12h16"/><path class="l3" d="M4 17h16"/></svg>
   </button>
 </header>
+<script>
+  // Высота закреплённой шапки → --hdr-h: отступ страницы и полоса под шапкой
+  (() => { const h = document.querySelector('header'),
+    set = () => document.documentElement.style.setProperty('--hdr-h', h.offsetHeight + 'px');
+    set(); new ResizeObserver(set).observe(h); })();
+</script>
 
 <main>
   <!-- Новости -->
