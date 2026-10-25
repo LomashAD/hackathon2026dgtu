@@ -23,7 +23,8 @@
   // подписи кнопки и окна — Inter, если он есть на портале, иначе системный шрифт; сам чат в iframe — Inter
   root.innerHTML = `<style>
     :host { all: initial; }
-    /* DESIGN.md «Graphite»: кнопка — знак помощника (public/favicon.svg), рамка Graphite Edge, окно — Obsidian Canvas с радиусом 10 px */
+    /* DESIGN.md «Graphite»: кнопка — знак помощника (public/favicon.svg), рамка Graphite Edge, окно — Obsidian Canvas
+       с углами 12 px, как у кнопки: окно вырастает из неё (.morph ниже) */
     .fab { position: fixed; right: 24px; bottom: 24px; width: 56px; height: 56px; padding: 0; border-radius: 12px;
            border: 1px solid #262626; background: ${color || '#0a0a0a'}; cursor: pointer; z-index: 2147483000;
            display: grid; place-items: center; box-shadow: rgba(0,0,0,.25) 0 4px 4px 0; }
@@ -43,17 +44,24 @@
     /* Размер и нижний отступ окна меняются мышью (--panel-w/-h/-b задаёт скрипт ниже), но окно всегда помещается на экране */
     .panel { position: fixed; right: 24px; bottom: var(--panel-b, 96px); box-sizing: border-box; width: var(--panel-w, 520px);
              height: var(--panel-h, 640px); max-width: calc(100vw - 48px); max-height: calc(100vh - var(--panel-b, 96px) - 24px);
-             display: none; flex-direction: column; background: #0a0a0a; border: 1px solid #262626; border-radius: 10px;
+             display: none; flex-direction: column; background: #0a0a0a; border: 1px solid #262626; border-radius: 12px;
              overflow: hidden; box-shadow: rgba(0,0,0,.3) 0 8px 10px 0; z-index: 2147483000; }
-    .panel.open { display: flex; }
+    .panel.open, .panel.closing { display: flex; }
+    .panel.closing { pointer-events: none; }   /* уже закрыто, видно только до конца анимации */
+    /* Копия кнопки: при открытии раздвигает края от кнопки до размеров окна, при закрытии сжимается обратно (скрипт ниже).
+       Лежит под окном и кнопкой: окно проявляется поверх неё, а в начале и в конце её закрывает сама кнопка */
+    .morph { position: fixed; z-index: 2147482999; box-sizing: border-box; border: 1px solid #262626; border-radius: 12px;
+             background: #0a0a0a; display: grid; place-items: center; pointer-events: none; }
+    .morph[hidden] { display: none; }
+    .morph svg { width: 54px; height: 54px; fill: none; stroke-width: 1.75; }   /* знак того же размера, что на кнопке */
     /* Окно прижато к правому краю, поэтому тянуть — за уголки слева, левый, верхний или нижний край */
     .rs { position: absolute; z-index: 1; touch-action: none; }
     .rs-l { left: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
     .rs-t { left: 0; top: 0; right: 0; height: 6px; cursor: ns-resize; }
     .rs-b { left: 0; bottom: 0; right: 0; height: 6px; cursor: ns-resize; }
     .grip { left: 0; width: 18px; height: 18px; color: #737373; }
-    .rs-lt { top: 0; cursor: nwse-resize; border-radius: 10px 0 0 0; }
-    .rs-lb { bottom: 0; cursor: nesw-resize; border-radius: 0 0 0 10px; }
+    .rs-lt { top: 0; cursor: nwse-resize; border-radius: 12px 0 0 0; }
+    .rs-lb { bottom: 0; cursor: nesw-resize; border-radius: 0 0 0 12px; }
     .grip:hover, .grip.dragging { color: #fafafa; }
     .grip:focus-visible { outline: 2px solid #737373; outline-offset: -2px; }
     .grip svg { position: absolute; left: 4px; top: 4px; width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
@@ -98,8 +106,59 @@
     const p = panel.getBoundingClientRect(), f = fab.getBoundingClientRect();
     fab.classList.toggle('tucked', panel.classList.contains('open') && p.bottom > f.top - 8);
   };
-  const open = () => { if (!frame.src) frame.src = base + '/?chat'; panel.classList.add('open'); updateFab(); };
-  const close = () => { panel.classList.remove('open'); updateFab(); };
+  // Окно вырастает из кнопки: копия знака (.morph) раздвигает края от кнопки до размеров окна, а цвета фона, рамки
+  // и тени переходят от кнопки к окну; затем поверх копии проявляется само окно. При закрытии — то же в обратную сторону,
+  // нажатие посреди анимации разворачивает её с того же места. prefers-reduced-motion — сразу, без анимации
+  const morph = document.createElement('div'), calm = matchMedia('(prefers-reduced-motion: reduce)');
+  morph.className = 'morph';
+  morph.hidden = true;
+  morph.setAttribute('aria-hidden', 'true');
+  morph.append(fab.querySelector('svg').cloneNode(true));
+  morph.querySelector('defs').remove();   // градиент знака — у кнопки, второй такой id не нужен
+  root.append(morph);
+  const EASE = 'cubic-bezier(.2, .8, .2, 1)';
+  let morphing = [];
+  const look = (el, r = el.getBoundingClientRect(), s = getComputedStyle(el)) => ({left: r.left + 'px', top: r.top + 'px',
+    width: r.width + 'px', height: r.height + 'px', backgroundColor: s.backgroundColor, borderColor: s.borderTopColor, boxShadow: s.boxShadow});
+  const alpha = el => +getComputedStyle(el).opacity;
+  function morphPanel(opening) {
+    const now = !morph.hidden && {look: look(morph), logo: alpha(morph.firstChild)};
+    const shown = now ? alpha(panel) : opening ? 0 : 1;   // у закрытого окна (display: none) opacity всё равно 1
+    morphing.forEach(a => a.cancel());
+    morph.hidden = calm.matches;
+    panel.classList.toggle('closing', !opening && !calm.matches);
+    if (calm.matches) return;
+    const icon = look(fab), win = look(panel), from = now ? now.look : opening ? icon : win;
+    const run = (el, frames, duration) => el.animate(frames, {duration, fill: 'both'});
+    const batch = morphing = opening ? [   // 360 мс: края — 260 мс, потом поверх копии проявляется окно
+      run(morph, [{...from, easing: EASE}, {...win, offset: .72}, win], 360),
+      run(morph.firstChild, [{opacity: now ? now.logo : 1}, {opacity: 0, offset: .4}, {opacity: 0}], 360),
+      run(panel, [{opacity: shown}, {opacity: shown, offset: .7}, {opacity: 1}], 360),
+    ] : [   // 300 мс: окно гаснет, под ним копия, потом её края сжимаются до кнопки
+      run(panel, [{opacity: shown}, {opacity: 0, offset: .3}, {opacity: 0}], 300),
+      run(morph, [from, {...from, offset: .3, easing: EASE}, icon], 300),
+      run(morph.firstChild, [{opacity: now ? now.logo : 0}, {opacity: now ? now.logo : 0, offset: .55}, {opacity: 1}], 300),
+    ];
+    Promise.all(batch.map(a => a.finished)).then(() => {
+      if (morphing !== batch) return;
+      batch.forEach(a => a.cancel());
+      morph.hidden = true;
+      panel.classList.remove('closing');
+    }, () => { /* развернули посреди анимации */ });
+  }
+  const open = () => {
+    if (!frame.src) frame.src = base + '/?chat';
+    if (panel.classList.contains('open')) return;
+    panel.classList.add('open');
+    updateFab();
+    morphPanel(true);
+  };
+  const close = () => {
+    if (!panel.classList.contains('open')) return;
+    panel.classList.remove('open');
+    updateFab();
+    morphPanel(false);
+  };
   fab.onclick = () => (panel.classList.contains('open') ? close() : open());
   root.querySelector('.close').onclick = close;
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
